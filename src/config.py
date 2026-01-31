@@ -8,11 +8,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _env(key: str, default: str = "") -> str:
+    """Get env value, stripping any inline comment."""
+    return os.getenv(key, default).split("#")[0].strip()
+
+
 class Config:
     """Application configuration."""
 
     # Source
-    PRIMARY_SOURCE: str = os.getenv("PRIMARY_SOURCE", "simkl")
+    PRIMARY_SOURCE: str = _env("PRIMARY_SOURCE", "simkl")
 
     # Simkl
     SIMKL_CLIENT_ID: str = os.getenv("SIMKL_CLIENT_ID", "")
@@ -25,22 +30,22 @@ class Config:
     # Tautulli
     TAUTULLI_URL: str = os.getenv("TAUTULLI_URL", "http://localhost:8181")
     TAUTULLI_API_KEY: str = os.getenv("TAUTULLI_API_KEY", "")
-    TAUTULLI_USER_ID: int = int(os.getenv("TAUTULLI_USER_ID", "1"))
+    TAUTULLI_USER_ID: int = int(_env("TAUTULLI_USER_ID", "1"))
 
     # TMDB
     TMDB_API_KEY: str = os.getenv("TMDB_API_KEY", "")
 
     # Options
-    EXPORT_RATINGS: bool = os.getenv("EXPORT_RATINGS", "true").lower() == "true"
-    EXPORT_WATCHLIST: bool = os.getenv("EXPORT_WATCHLIST", "true").lower() == "true"
-    EXPORT_WATCHED: bool = os.getenv("EXPORT_WATCHED", "true").lower() == "true"
-    SKIP_SERIES: bool = os.getenv("SKIP_SERIES", "true").lower() == "true"
+    EXPORT_RATINGS: bool = _env("EXPORT_RATINGS", "true").lower() == "true"
+    EXPORT_WATCHLIST: bool = _env("EXPORT_WATCHLIST", "true").lower() == "true"
+    EXPORT_WATCHED: bool = _env("EXPORT_WATCHED", "true").lower() == "true"
+    SKIP_SERIES: bool = _env("SKIP_SERIES", "true").lower() == "true"
     OUTPUT_DIR: Path = Path(os.getenv("OUTPUT_DIR", "./output"))
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
     # Web interface
-    WEB_PORT: int = int(os.getenv("WEB_PORT", "19876").split("#")[0].strip())
-    SYNC_INTERVAL: int = int(os.getenv("SYNC_INTERVAL", "15").split("#")[0].strip())
+    WEB_PORT: int = int(_env("WEB_PORT", "19876"))
+    SYNC_INTERVAL: int = int(_env("SYNC_INTERVAL", "15"))
 
     @classmethod
     def validate(cls) -> list[str]:
