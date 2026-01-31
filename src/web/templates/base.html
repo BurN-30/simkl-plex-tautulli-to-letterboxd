@@ -263,25 +263,35 @@
 
         let _authPoll = null;
 
+        function authError(msg) {
+            const btn = document.getElementById('auth-btn');
+            const statusEl = document.getElementById('auth-status-text');
+            if (_authPoll) { clearInterval(_authPoll); _authPoll = null; }
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            statusEl.classList.remove('hidden');
+            statusEl.textContent = msg;
+            showToast(msg);
+        }
+
         async function startAuth() {
             const btn = document.getElementById('auth-btn');
             const statusEl = document.getElementById('auth-status-text');
             btn.disabled = true;
             btn.style.opacity = '0.5';
+            statusEl.classList.add('hidden');
 
             try {
                 const res = await fetch('/api/auth/start', { method: 'POST' });
-                if (!res.ok) {
-                    const err = await res.json();
-                    showToast(err.detail || 'Erreur du serveur');
-                    btn.disabled = false;
-                    btn.style.opacity = '1';
-                    return;
-                }
                 const data = await res.json();
 
                 if (data.status === 'already_authenticated') {
                     document.getElementById('auth-banner').classList.add('hidden');
+                    return;
+                }
+
+                if (data.status === 'error') {
+                    authError(data.error);
                     return;
                 }
 
@@ -291,30 +301,30 @@
                     statusEl.textContent = 'Autorisez dans la nouvelle fenêtre...';
 
                     _authPoll = setInterval(async () => {
-                        const r = await fetch('/api/auth/status');
-                        const d = await r.json();
-                        if (d.authenticated) {
-                            clearInterval(_authPoll);
-                            _authPoll = null;
-                            document.getElementById('auth-banner').classList.add('hidden');
-                            showToast('Simkl connecté');
-                        }
+                        try {
+                            const r = await fetch('/api/auth/status');
+                            const d = await r.json();
+                            if (d.authenticated) {
+                                clearInterval(_authPoll);
+                                _authPoll = null;
+                                document.getElementById('auth-banner').classList.add('hidden');
+                                showToast('Simkl connecté');
+                                return;
+                            }
+                            if (d.oauth && d.oauth.status === 'error') {
+                                authError(d.oauth.error);
+                            }
+                        } catch (e) {}
                     }, 2000);
 
                     setTimeout(() => {
                         if (_authPoll) {
-                            clearInterval(_authPoll);
-                            _authPoll = null;
-                            btn.disabled = false;
-                            btn.style.opacity = '1';
-                            statusEl.textContent = 'Délai dépassé. Réessayez.';
+                            authError('Délai dépassé (5 min). Réessayez.');
                         }
                     }, 300000);
                 }
             } catch (e) {
-                btn.disabled = false;
-                btn.style.opacity = '1';
-                showToast('Erreur lors de la connexion');
+                authError('Erreur réseau — vérifiez que le serveur est en cours d\'exécution');
             }
         }
 

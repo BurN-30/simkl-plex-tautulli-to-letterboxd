@@ -235,21 +235,25 @@ async def trigger_sync():
 # ============== Auth Endpoints ==============
 
 _oauth_instance = None
-_oauth_pending = False
+_oauth_state = {"status": "idle", "error": None}
 
 
 @app.get("/api/auth/status")
 async def auth_status():
-    """Check authentication status for the configured source."""
+    """Check authentication status and OAuth state."""
     if Config.PRIMARY_SOURCE != "simkl":
         return {"authenticated": True}
-    return {"authenticated": Config.SIMKL_TOKEN_FILE.exists()}
+    authenticated = Config.SIMKL_TOKEN_FILE.exists()
+    return {
+        "authenticated": authenticated,
+        "oauth": _oauth_state if not authenticated else None,
+    }
 
 
 @app.post("/api/auth/start")
 async def auth_start():
     """Start Simkl OAuth flow. Returns auth URL to open in browser."""
-    global _oauth_instance, _oauth_pending
+    global _oauth_instance, _oauth_state
     import threading
     from src.auth.simkl_oauth import SimklOAuth
 
@@ -257,9 +261,11 @@ async def auth_start():
         return {"status": "already_authenticated"}
 
     if not Config.SIMKL_CLIENT_ID:
-        raise HTTPException(status_code=503, detail="SIMKL_CLIENT_ID not configured")
+        _oauth_state = {"status": "error", "error": "SIMKL_CLIENT_ID non configuré dans .env"}
+        return {"status": "error", "error": _oauth_state["error"]}
 
-    if _oauth_pending and _oauth_instance:
+    # Already pending — return existing auth URL
+    if _oauth_state["status"] == "pending" and _oauth_instance:
         return {"status": "pending", "auth_url": _oauth_instance.get_auth_url()}
 
     _oauth_instance = SimklOAuth(Config.SIMKL_CLIENT_ID, Config.SIMKL_TOKEN_FILE)
@@ -267,17 +273,21 @@ async def auth_start():
         _oauth_instance.start_callback_server()
     except OSError as e:
         _oauth_instance = None
-        raise HTTPException(status_code=503, detail=f"Port 8888 occupé ({e}). Fermez l'autre application ou changez le port.")
-    _oauth_pending = True
+        _oauth_state = {"status": "error", "error": f"Port 8888 occupé — fermez l'autre application ({e})"}
+        return {"status": "error", "error": _oauth_state["error"]}
+
+    _oauth_state = {"status": "pending", "error": None}
+    logger.info("OAuth callback server started, waiting for Simkl redirect...")
 
     def wait_and_exchange():
-        global _oauth_pending
+        global _oauth_state
         token = _oauth_instance.wait_for_callback(timeout=300)
-        _oauth_pending = False
         if token:
+            _oauth_state = {"status": "success", "error": None}
             logger.info("Simkl OAuth authentication successful")
         else:
-            logger.error("Simkl OAuth authentication failed or timed out")
+            _oauth_state = {"status": "error", "error": "Aucun code reçu — autorisation annulée ou délai dépassé (5 min)"}
+            logger.error("Simkl OAuth: no authorization code received")
 
     threading.Thread(target=wait_and_exchange, daemon=True).start()
 
