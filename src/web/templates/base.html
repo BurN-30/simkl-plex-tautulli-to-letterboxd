@@ -271,6 +271,13 @@
 
             try {
                 const res = await fetch('/api/auth/start', { method: 'POST' });
+                if (!res.ok) {
+                    const err = await res.json();
+                    showToast(err.detail || 'Erreur du serveur');
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    return;
+                }
                 const data = await res.json();
 
                 if (data.status === 'already_authenticated') {

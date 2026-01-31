@@ -263,7 +263,11 @@ async def auth_start():
         return {"status": "pending", "auth_url": _oauth_instance.get_auth_url()}
 
     _oauth_instance = SimklOAuth(Config.SIMKL_CLIENT_ID, Config.SIMKL_TOKEN_FILE)
-    _oauth_instance.start_callback_server()
+    try:
+        _oauth_instance.start_callback_server()
+    except OSError as e:
+        _oauth_instance = None
+        raise HTTPException(status_code=503, detail=f"Port 8888 occupé ({e}). Fermez l'autre application ou changez le port.")
     _oauth_pending = True
 
     def wait_and_exchange():
