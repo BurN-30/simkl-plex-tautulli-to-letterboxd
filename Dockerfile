@@ -7,6 +7,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
 
-RUN mkdir -p output logs
+RUN mkdir -p output logs data
 
-ENTRYPOINT ["python", "src/main.py"]
+EXPOSE 19876
+
+# Default to web server, can be overridden for CLI
+ENTRYPOINT ["python", "src/server.py"]

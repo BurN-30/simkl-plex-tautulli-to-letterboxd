@@ -16,6 +16,7 @@ env/
 # Output files
 output/
 logs/
+data/
 
 # IDE
 .vscode/

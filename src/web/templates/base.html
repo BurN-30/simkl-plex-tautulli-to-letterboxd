@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Simkl to Letterboxd{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { 'sans': ['Inter', 'system-ui', 'sans-serif'] },
+                    colors: {
+                        'bg': { 'primary': '#0a0a0b', 'secondary': '#111113', 'tertiary': '#18181b' },
+                        'border': { 'default': '#27272a', 'hover': '#3f3f46' },
+                        'accent': { 'primary': '#3b82f6', 'green': '#22c55e', 'amber': '#f59e0b' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #0a0a0b; }
+
+        .card {
+            background: #111113;
+            border: 1px solid #27272a;
+            border-radius: 8px;
+        }
+        .card:hover { border-color: #3f3f46; }
+
+        .poster {
+            position: relative;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #18181b;
+        }
+        .poster::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 40%, transparent 70%);
+        }
+        .poster-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 10px;
+            z-index: 10;
+        }
+        .poster:hover { transform: scale(1.02); transition: transform 0.15s; }
+
+        .carousel { overflow-x: auto; scrollbar-width: none; scroll-snap-type: x mandatory; scroll-padding-left: 24px; }
+        .carousel::-webkit-scrollbar { display: none; }
+        .carousel-item { scroll-snap-align: start; flex-shrink: 0; }
+
+        /* Responsive grid - auto-fill based on screen */
+        @media (min-width: 2560px) { .carousel-item.w-36 { width: 180px; } }
+        @media (min-width: 1920px) and (max-width: 2559px) { .carousel-item.w-36 { width: 160px; } }
+
+        .btn { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; transition: all 0.15s; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-ghost { background: transparent; border: 1px solid #27272a; color: #a1a1aa; }
+        .btn-ghost:hover { border-color: #3f3f46; color: white; }
+
+        .input {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: white;
+            font-size: 14px;
+        }
+        .input:focus { outline: none; border-color: #3b82f6; }
+        .input::placeholder { color: #52525b; }
+
+        .tag { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+        .tag-green { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+        .tag-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+
+        .icon-link { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 4px; transition: opacity 0.15s; opacity: 0.85; }
+        .icon-link:hover { opacity: 1; }
+        .icon-link img, .icon-link svg { width: 14px; height: 14px; }
+        .icon-lb { background: #00d735; }
+        .icon-imdb { background: #f5c518; }
+        .icon-tmdb { background: #01b4e4; }
+
+        .stars { color: #fbbf24; letter-spacing: -1px; }
+        .spinner { width: 16px; height: 16px; border: 2px solid #27272a; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="text-zinc-100 font-sans min-h-screen">
+    <!-- Header -->
+    <header class="border-b border-zinc-800 sticky top-0 z-50 bg-bg-primary/95 backdrop-blur-sm">
+        <div class="px-6 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-3">
+                    <span class="text-lg font-semibold">Simkl to Letterboxd</span>
+                    <a href="https://github.com/BurN-30/simkl-plex-tautulli-to-letterboxd" target="_blank" class="text-zinc-500 hover:text-white transition" title="GitHub">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    </a>
+                </div>
+                <nav class="flex gap-1">
+                    <a href="/" class="px-3 py-1.5 rounded text-sm {% if request.url.path == '/' %}bg-zinc-800 text-white{% else %}text-zinc-400 hover:text-white{% endif %}">Films</a>
+                    <a href="/watchlist" class="px-3 py-1.5 rounded text-sm {% if request.url.path == '/watchlist' %}bg-zinc-800 text-white{% else %}text-zinc-400 hover:text-white{% endif %}">Watchlist</a>
+                    <a href="/stats" class="px-3 py-1.5 rounded text-sm {% if request.url.path == '/stats' %}bg-zinc-800 text-white{% else %}text-zinc-400 hover:text-white{% endif %}">Stats</a>
+                </nav>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="sync-status" class="flex items-center gap-2 text-sm text-zinc-500">
+                    <span id="sync-indicator" class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span id="sync-text">Synced</span>
+                </div>
+                <button id="sync-btn" onclick="triggerSync()" class="btn btn-primary">Sync</button>
+                <a href="/api/export/csv?watched=true" class="btn btn-ghost">Export</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="px-6 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 card px-4 py-2.5 text-sm transform translate-y-16 opacity-0 transition-all z-50">
+        <span id="toast-message"></span>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50">
+        <div class="card p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-semibold mb-5" id="modal-title">Edit</h3>
+            <form id="edit-form" class="space-y-4">
+                <input type="hidden" id="edit-movie-id">
+                <div>
+                    <label class="block text-sm text-zinc-400 mb-1.5">Rating</label>
+                    <div id="edit-rating" class="stars text-xl cursor-pointer" data-rating="0">
+                        {% for i in range(1, 11) %}<span data-value="{{ i * 0.5 }}">★</span>{% endfor %}
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-zinc-400 mb-1.5">Watch Date</label>
+                    <input type="date" id="edit-date" class="input w-full">
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="edit-rewatch" class="w-4 h-4 rounded bg-zinc-800 border-zinc-600">
+                    <label for="edit-rewatch" class="text-sm">Rewatch</label>
+                </div>
+                <div>
+                    <label class="block text-sm text-zinc-400 mb-1.5">Tags</label>
+                    <input type="text" id="edit-tags" class="input w-full" placeholder="horror, favorite">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal()" class="btn btn-ghost">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function showToast(msg, dur = 3000) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-message').textContent = msg;
+            t.classList.remove('translate-y-16', 'opacity-0');
+            setTimeout(() => t.classList.add('translate-y-16', 'opacity-0'), dur);
+        }
+
+        async function triggerSync() {
+            const btn = document.getElementById('sync-btn');
+            const ind = document.getElementById('sync-indicator');
+            const txt = document.getElementById('sync-text');
+            btn.innerHTML = '<div class="spinner"></div>';
+            ind.className = 'w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse';
+            txt.textContent = 'Syncing...';
+            try {
+                await fetch('/api/sync/trigger', { method: 'POST' });
+                showToast('Sync started');
+                setTimeout(() => {
+                    ind.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500';
+                    txt.textContent = 'Synced';
+                    btn.textContent = 'Sync';
+                    if (typeof loadMovies === 'function') loadMovies();
+                }, 2000);
+            } catch (e) {
+                showToast('Sync failed');
+                ind.className = 'w-1.5 h-1.5 rounded-full bg-red-500';
+                btn.textContent = 'Sync';
+            }
+        }
+
+        function openEditModal(movie) {
+            document.getElementById('modal-title').textContent = movie.title;
+            document.getElementById('edit-movie-id').value = movie.id;
+            document.getElementById('edit-date').value = movie.watched_date || '';
+            document.getElementById('edit-rewatch').checked = movie.rewatch || false;
+            document.getElementById('edit-tags').value = movie.tags || '';
+            updateStars(document.getElementById('edit-rating'), movie.rating || 0);
+            document.getElementById('edit-modal').classList.remove('hidden');
+            document.getElementById('edit-modal').classList.add('flex');
+        }
+
+        function closeModal() {
+            document.getElementById('edit-modal').classList.add('hidden');
+            document.getElementById('edit-modal').classList.remove('flex');
+        }
+
+        function updateStars(container, rating) {
+            container.dataset.rating = rating;
+            container.querySelectorAll('span').forEach(s => {
+                s.style.opacity = parseFloat(s.dataset.value) <= rating ? '1' : '0.2';
+            });
+        }
+
+        document.querySelectorAll('#edit-rating span').forEach(s => {
+            s.addEventListener('click', () => updateStars(s.parentElement, parseFloat(s.dataset.value)));
+        });
+
+        document.getElementById('edit-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const id = document.getElementById('edit-movie-id').value;
+            const res = await fetch(`/api/movies/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    rating: parseFloat(document.getElementById('edit-rating').dataset.rating) || null,
+                    watched_date: document.getElementById('edit-date').value || null,
+                    rewatch: document.getElementById('edit-rewatch').checked,
+                    tags: document.getElementById('edit-tags').value || null,
+                })
+            });
+            if (res.ok) { showToast('Saved'); closeModal(); if (typeof loadMovies === 'function') loadMovies(); }
+        });
+
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+        document.getElementById('edit-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

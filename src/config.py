@@ -38,6 +38,10 @@ class Config:
     OUTPUT_DIR: Path = Path(os.getenv("OUTPUT_DIR", "./output"))
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
+    # Web interface
+    WEB_PORT: int = int(os.getenv("WEB_PORT", "19876"))
+    SYNC_INTERVAL: int = int(os.getenv("SYNC_INTERVAL", "15"))  # minutes
+
     @classmethod
     def validate(cls) -> list[str]:
         """Validate required configuration. Returns list of errors."""

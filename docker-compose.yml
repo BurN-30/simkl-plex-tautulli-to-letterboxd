@@ -3,9 +3,13 @@ version: '3.8'
 services:
   letterboxd-sync:
     build: .
+    ports:
+      - "${WEB_PORT:-19876}:19876"
     env_file:
       - .env
     volumes:
       - ./output:/app/output
       - ./logs:/app/logs
+      - ./data:/app/data
       - ./.simkl_token:/app/.simkl_token
+    restart: unless-stopped
