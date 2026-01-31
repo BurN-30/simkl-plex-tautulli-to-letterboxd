@@ -13,9 +13,13 @@ Export your watch history from Simkl, Plex, or Tautulli to a Letterboxd-compatib
 - **Letterboxd Export** - CSV formatted for direct import
 - **Statistics** - Ratings distribution, films per month/year
 
-## Installation
+## Getting Started
 
-### Windows
+This guide covers the default setup using **Simkl** as the data source. If you use Plex or Tautulli instead, follow steps 1–2, then jump to [Alternative Sources](#alternative-sources).
+
+### 1. Install dependencies
+
+**Windows:**
 
 ```powershell
 git clone https://github.com/BurN-30/simkl-plex-tautulli-to-letterboxd.git
@@ -25,7 +29,7 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### Linux/macOS
+**Linux/macOS:**
 
 ```bash
 git clone https://github.com/BurN-30/simkl-plex-tautulli-to-letterboxd.git
@@ -35,98 +39,116 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Docker
+### 2. Create your `.env` file
 
-```bash
-docker build -t simkl-to-letterboxd .
-docker run --rm --env-file .env -p 19876:19876 -v $(pwd)/output:/app/output simkl-to-letterboxd
+```powershell
+copy .env.example .env    # Windows
+cp .env.example .env      # Linux/macOS
 ```
 
-## Configuration
-
-### 1. Copy the example file
-
-```bash
-cp .env.example .env
-```
+Open `.env` in a text editor. You will fill in the required values in the next steps.
 
 > **Important:** All placeholder values (`your_client_id`, `your_tmdb_api_key`, etc.) must be replaced with real values. The server will refuse to start if it detects a placeholder.
 
-### 2. Simkl Client ID (required if `PRIMARY_SOURCE=simkl`)
+### 3. Register a Simkl app
 
-1. Go to [https://simkl.com/settings/developer/](https://simkl.com/settings/developer/)
-2. Log in with your Simkl account
-3. Click **Create new app**
-4. Fill in the name and set the **Redirect URI** to:
+You need to create an app on Simkl's developer portal to get the Client ID and Client Secret used for authentication.
+
+1. Go to [https://simkl.com/settings/developer/](https://simkl.com/settings/developer/) and log in with your Simkl account
+2. Click **Create new app**
+3. Enter any name for the app (e.g. `Letterboxd Sync`)
+4. Set the **Redirect URI** to exactly:
    ```
    http://localhost:19877/callback
    ```
-   > If you changed `OAUTH_PORT` in `.env`, use that port number instead of `19877`.
-5. Copy the **Client ID** and the **Client Secret** and paste them into `.env`:
-   ```
-   SIMKL_CLIENT_ID=your_actual_client_id_here
-   SIMKL_CLIENT_SECRET=your_actual_client_secret_here
+   > This value must match exactly what the app expects. If you plan to change `OAUTH_PORT` in your `.env`, use that port number here instead of `19877`. A mismatch will cause Simkl to reject the connection.
+5. Save the app
+6. Copy the **Client ID** and the **Client Secret** from the app page, then paste them into `.env`:
+   ```env
+   SIMKL_CLIENT_ID=<your Client ID>
+   SIMKL_CLIENT_SECRET=<your Client Secret>
    ```
 
-### 3. TMDB API Key (required)
+### 4. Get a TMDB API key
 
-1. Create a free account at [https://www.themoviedb.org/](https://www.themoviedb.org/)
-2. Go to **Settings → API** (https://www.themoviedb.org/settings/api)
-3. Create an application (select **Personal** use)
+TMDB is used to validate movie data and retrieve IMDb IDs, directors, and posters. A free account is sufficient.
+
+1. Create an account at [https://www.themoviedb.org/](https://www.themoviedb.org/)
+2. Go to **Settings → API** ([https://www.themoviedb.org/settings/api](https://www.themoviedb.org/settings/api))
+3. Click **Create an application** and select **Personal**
 4. Copy the **API Key (v3 auth)** and paste it into `.env`:
-   ```
-   TMDB_API_KEY=your_actual_tmdb_key_here
-   ```
-
-### 4. Plex Token (only if `PRIMARY_SOURCE=plex`)
-
-1. Open **Plex Web** and log in
-2. Go to **Settings → Troubleshooting**
-3. Click **Copy Support Logs** — your token is visible in the URL bar when accessing your Plex server, or you can extract it from any API call in the browser DevTools (look for the `X-Plex-Token` header)
-4. Paste it into `.env`:
-   ```
-   PLEX_TOKEN=your_actual_plex_token_here
-   PLEX_URL=http://your-plex-server:32400
+   ```env
+   TMDB_API_KEY=<your TMDB API key>
    ```
 
-### 5. Tautulli API Key (only if `PRIMARY_SOURCE=tautulli`)
+### 5. Start the server
 
-1. Open your **Tautulli** web interface
-2. Go to **Settings → API** (usually at `/settings`)
-3. Copy the **API Key** and paste it into `.env`:
-   ```
-   TAUTULLI_API_KEY=your_actual_tautulli_key_here
-   TAUTULLI_URL=http://your-tautulli-server:8181
-   TAUTULLI_USER_ID=1
-   ```
-   > `TAUTULLI_USER_ID` is the numeric ID of the user whose history you want to sync. Check Tautulli's user list to find it.
-
-## Usage
-
-### Web Interface (Recommended)
+Make sure your virtual environment is activated, then run:
 
 ```bash
 python src/server.py
 ```
 
-Open http://localhost:19876 in your browser.
+Open [http://localhost:19876](http://localhost:19876) in your browser. If the server detects a missing or placeholder value in `.env`, it will print the exact error and refuse to start — fix the value and restart.
 
-Features:
-- View all watched films with posters, ratings, and dates
-- Edit ratings, watch dates, tags, and reviews
-- Filter by year, rating, or search by title
-- View statistics and charts
-- Auto-sync with Simkl every 15 minutes (configurable)
-- Export to Letterboxd CSV
+### 6. Connect your Simkl account
 
-### CLI Export
+A banner at the top of the dashboard prompts you to authenticate with Simkl.
+
+1. Click **Connecter Simkl**
+2. A new tab opens on Simkl's authorization page — log in and click **Allow**
+3. Return to the dashboard. The banner disappears and the first sync starts automatically.
+
+Your watched movies and watchlist are now imported. A new sync runs every 15 minutes in the background (configurable via `SYNC_INTERVAL` in `.env`).
+
+---
+
+### Alternative Sources
+
+If you use **Plex** or **Tautulli** instead of Simkl, set `PRIMARY_SOURCE` in `.env` and fill in the corresponding values. You still need a valid `TMDB_API_KEY` regardless of the source.
+
+**Plex:**
+
+```env
+PRIMARY_SOURCE=plex
+PLEX_URL=http://your-plex-server:32400
+PLEX_TOKEN=<your Plex token>
+```
+
+To find your Plex token: open Plex Web → Settings → Troubleshooting, or look for the `X-Plex-Token` header in any API call in browser DevTools.
+
+**Tautulli:**
+
+```env
+PRIMARY_SOURCE=tautulli
+TAUTULLI_URL=http://your-tautulli-server:8181
+TAUTULLI_API_KEY=<your Tautulli API key>
+TAUTULLI_USER_ID=1
+```
+
+`TAUTULLI_USER_ID` is the numeric ID of the user whose history you want to sync — check your Tautulli user list to find it.
+
+---
+
+### Docker
+
+```bash
+docker build -t simkl-to-letterboxd .
+docker run --rm --env-file .env -p 19876:19876 -p 19877:19877 -v $(pwd)/output:/app/output simkl-to-letterboxd
+```
+
+> Both ports must be exposed: `19876` for the web dashboard and `19877` for the Simkl OAuth callback. The Redirect URI in your Simkl app must still point to `http://localhost:19877/callback`.
+
+## CLI Export
+
+The web dashboard is the recommended way to use the tool, but you can also run a one-off export from the command line:
 
 ```bash
 python src/main.py
 ```
 
 Options:
-- `--source` - Data source (simkl, plex, tautulli)
+- `--source` - Data source override (simkl, plex, tautulli)
 - `--no-watchlist` - Skip watchlist export
 - `--no-watched` - Skip watched history export
 
@@ -153,12 +175,6 @@ tt0111161,278,The Shawshank Redemption,1994,Frank Darabont,2024-01-15,5,false,,
 | Simkl | Watched, Ratings, Watchlist | TMDB, IMDb, TVDB |
 | Plex | Watched, Ratings | TMDB, IMDb (via guids) |
 | Tautulli | Watch history | Title + Year |
-
-## Simkl Authentication
-
-On first launch, a banner appears at the top of the dashboard with a **Connecter Simkl** button. Clicking it opens the Simkl authorization page in a new tab. After you grant access, the token is saved automatically to `.simkl_token` and syncing starts.
-
-> The **Redirect URI** configured in your Simkl app must match `http://localhost:{OAUTH_PORT}/callback` (default: `http://localhost:19877/callback`). If they don't match, Simkl will reject the request.
 
 ## Environment Variables
 
