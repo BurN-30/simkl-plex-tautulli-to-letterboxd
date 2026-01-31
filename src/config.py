@@ -45,6 +45,7 @@ class Config:
 
     # Web interface
     WEB_PORT: int = int(_env("WEB_PORT", "19876"))
+    OAUTH_PORT: int = int(_env("OAUTH_PORT", "19877"))
     SYNC_INTERVAL: int = int(_env("SYNC_INTERVAL", "15"))
 
     @classmethod

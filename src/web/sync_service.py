@@ -38,6 +38,7 @@ class SyncService:
             return SimklSource(
                 client_id=Config.SIMKL_CLIENT_ID,
                 token_file=Config.SIMKL_TOKEN_FILE,
+                port=Config.OAUTH_PORT,
             )
         elif name == "plex":
             from src.sources.plex import PlexSource

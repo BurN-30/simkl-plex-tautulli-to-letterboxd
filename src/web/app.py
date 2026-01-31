@@ -268,12 +268,12 @@ async def auth_start():
     if _oauth_state["status"] == "pending" and _oauth_instance:
         return {"status": "pending", "auth_url": _oauth_instance.get_auth_url()}
 
-    _oauth_instance = SimklOAuth(Config.SIMKL_CLIENT_ID, Config.SIMKL_TOKEN_FILE)
+    _oauth_instance = SimklOAuth(Config.SIMKL_CLIENT_ID, Config.SIMKL_TOKEN_FILE, port=Config.OAUTH_PORT)
     try:
         _oauth_instance.start_callback_server()
     except OSError as e:
         _oauth_instance = None
-        _oauth_state = {"status": "error", "error": f"Port 8888 occupé — fermez l'autre application ({e})"}
+        _oauth_state = {"status": "error", "error": f"Port {Config.OAUTH_PORT} occupé — changez OAUTH_PORT dans .env ({e})"}
         return {"status": "error", "error": _oauth_state["error"]}
 
     _oauth_state = {"status": "pending", "error": None}

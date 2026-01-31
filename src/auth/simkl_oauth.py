@@ -59,12 +59,12 @@ class SimklOAuth:
 
     AUTH_URL = "https://simkl.com/oauth/authorize"
     TOKEN_URL = "https://api.simkl.com/oauth/token"
-    REDIRECT_URI = "http://localhost:8888/callback"
-    PORT = 8888
 
-    def __init__(self, client_id: str, token_file: Path):
+    def __init__(self, client_id: str, token_file: Path, port: int = 19877):
         self.client_id = client_id
         self.token_file = token_file
+        self.PORT = port
+        self.REDIRECT_URI = f"http://localhost:{port}/callback"
         self._access_token: Optional[str] = None
 
     @property
