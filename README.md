@@ -44,16 +44,61 @@ docker run --rm --env-file .env -p 19876:19876 -v $(pwd)/output:/app/output simk
 
 ## Configuration
 
-1. Copy the example file:
-   ```bash
-   cp .env.example .env
+### 1. Copy the example file
+
+```bash
+cp .env.example .env
+```
+
+> **Important:** All placeholder values (`your_client_id`, `your_tmdb_api_key`, etc.) must be replaced with real values. The server will refuse to start if it detects a placeholder.
+
+### 2. Simkl Client ID (required if `PRIMARY_SOURCE=simkl`)
+
+1. Go to [https://simkl.com/settings/developer/](https://simkl.com/settings/developer/)
+2. Log in with your Simkl account
+3. Click **Create new app**
+4. Fill in the name and set the **Redirect URI** to:
+   ```
+   http://localhost:19877/callback
+   ```
+   > If you changed `OAUTH_PORT` in `.env`, use that port number instead of `19877`.
+5. Copy the **Client ID** and paste it into `.env`:
+   ```
+   SIMKL_CLIENT_ID=your_actual_client_id_here
    ```
 
-2. Edit `.env` with your API keys:
-   - **SIMKL_CLIENT_ID** - Create an app at https://simkl.com/settings/developer/
-   - **TMDB_API_KEY** - Get one at https://www.themoviedb.org/settings/api
-   - **PLEX_TOKEN** (optional) - Plex authentication token
-   - **TAUTULLI_API_KEY** (optional) - Tautulli API key
+### 3. TMDB API Key (required)
+
+1. Create a free account at [https://www.themoviedb.org/](https://www.themoviedb.org/)
+2. Go to **Settings → API** (https://www.themoviedb.org/settings/api)
+3. Create an application (select **Personal** use)
+4. Copy the **API Key (v3 auth)** and paste it into `.env`:
+   ```
+   TMDB_API_KEY=your_actual_tmdb_key_here
+   ```
+
+### 4. Plex Token (only if `PRIMARY_SOURCE=plex`)
+
+1. Open **Plex Web** and log in
+2. Go to **Settings → Troubleshooting**
+3. Click **Copy Support Logs** — your token is visible in the URL bar when accessing your Plex server, or you can extract it from any API call in the browser DevTools (look for the `X-Plex-Token` header)
+4. Paste it into `.env`:
+   ```
+   PLEX_TOKEN=your_actual_plex_token_here
+   PLEX_URL=http://your-plex-server:32400
+   ```
+
+### 5. Tautulli API Key (only if `PRIMARY_SOURCE=tautulli`)
+
+1. Open your **Tautulli** web interface
+2. Go to **Settings → API** (usually at `/settings`)
+3. Copy the **API Key** and paste it into `.env`:
+   ```
+   TAUTULLI_API_KEY=your_actual_tautulli_key_here
+   TAUTULLI_URL=http://your-tautulli-server:8181
+   TAUTULLI_USER_ID=1
+   ```
+   > `TAUTULLI_USER_ID` is the numeric ID of the user whose history you want to sync. Check Tautulli's user list to find it.
 
 ## Usage
 
@@ -110,21 +155,25 @@ tt0111161,278,The Shawshank Redemption,1994,Frank Darabont,2024-01-15,5,false,,
 
 ## Simkl Authentication
 
-On first run, the tool automatically opens your browser for OAuth authentication. The token is saved to `.simkl_token`.
+On first launch, a banner appears at the top of the dashboard with a **Connecter Simkl** button. Clicking it opens the Simkl authorization page in a new tab. After you grant access, the token is saved automatically to `.simkl_token` and syncing starts.
+
+> The **Redirect URI** configured in your Simkl app must match `http://localhost:{OAUTH_PORT}/callback` (default: `http://localhost:19877/callback`). If they don't match, Simkl will reject the request.
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PRIMARY_SOURCE` | Data source | `simkl` |
-| `SIMKL_CLIENT_ID` | Simkl app client ID | - |
-| `TMDB_API_KEY` | TMDB API key | - |
-| `PLEX_URL` | Plex server URL | `http://localhost:32400` |
-| `PLEX_TOKEN` | Plex auth token | - |
-| `TAUTULLI_URL` | Tautulli URL | `http://localhost:8181` |
-| `TAUTULLI_API_KEY` | Tautulli API key | - |
-| `WEB_PORT` | Web server port | `19876` |
-| `SYNC_INTERVAL` | Auto-sync interval (minutes) | `15` |
+| Variable | Description | Default | Where to find it |
+|----------|-------------|---------|------------------|
+| `PRIMARY_SOURCE` | Which service to sync from (`simkl`, `plex`, `tautulli`) | `simkl` | — |
+| `SIMKL_CLIENT_ID` | Your Simkl app client ID | — | [simkl.com/settings/developer](https://simkl.com/settings/developer/) |
+| `TMDB_API_KEY` | TMDB v3 API key | — | [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) |
+| `PLEX_URL` | URL of your Plex server | `http://localhost:32400` | Plex Web → Settings |
+| `PLEX_TOKEN` | Plex authentication token | — | Plex Web → Settings → Troubleshooting (or `X-Plex-Token` header in DevTools) |
+| `TAUTULLI_URL` | URL of your Tautulli instance | `http://localhost:8181` | Your Tautulli address bar |
+| `TAUTULLI_API_KEY` | Tautulli API key | — | Tautulli → Settings → API |
+| `TAUTULLI_USER_ID` | Numeric ID of the Tautulli user to sync | `1` | Tautulli → Users list |
+| `WEB_PORT` | Web dashboard port | `19876` | — |
+| `OAUTH_PORT` | Simkl OAuth callback port (must match redirect URI in Simkl app settings) | `19877` | — |
+| `SYNC_INTERVAL` | Auto-sync interval in minutes | `15` | — |
 
 ## License
 
