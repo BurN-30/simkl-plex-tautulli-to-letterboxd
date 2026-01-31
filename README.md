@@ -95,7 +95,7 @@ Open [http://localhost:19876](http://localhost:19876) in your browser. If the se
 
 A banner at the top of the dashboard prompts you to authenticate with Simkl.
 
-1. Click **Connecter Simkl**
+1. Click **Connect Simkl**
 2. A new tab opens on Simkl's authorization page — log in and click **Allow**
 3. Return to the dashboard. The banner disappears and the first sync starts automatically.
 
