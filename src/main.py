@@ -41,6 +41,7 @@ def get_source(source_name: str) -> BaseSource:
     if source_name == "simkl":
         return SimklSource(
             client_id=Config.SIMKL_CLIENT_ID,
+            client_secret=Config.SIMKL_CLIENT_SECRET,
             token_file=Config.SIMKL_TOKEN_FILE,
             port=Config.OAUTH_PORT,
         )

@@ -62,9 +62,10 @@ cp .env.example .env
    http://localhost:19877/callback
    ```
    > If you changed `OAUTH_PORT` in `.env`, use that port number instead of `19877`.
-5. Copy the **Client ID** and paste it into `.env`:
+5. Copy the **Client ID** and the **Client Secret** and paste them into `.env`:
    ```
    SIMKL_CLIENT_ID=your_actual_client_id_here
+   SIMKL_CLIENT_SECRET=your_actual_client_secret_here
    ```
 
 ### 3. TMDB API Key (required)
@@ -165,6 +166,7 @@ On first launch, a banner appears at the top of the dashboard with a **Connecter
 |----------|-------------|---------|------------------|
 | `PRIMARY_SOURCE` | Which service to sync from (`simkl`, `plex`, `tautulli`) | `simkl` | — |
 | `SIMKL_CLIENT_ID` | Your Simkl app client ID | — | [simkl.com/settings/developer](https://simkl.com/settings/developer/) |
+| `SIMKL_CLIENT_SECRET` | Your Simkl app client secret | — | [simkl.com/settings/developer](https://simkl.com/settings/developer/) |
 | `TMDB_API_KEY` | TMDB v3 API key | — | [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) |
 | `PLEX_URL` | URL of your Plex server | `http://localhost:32400` | Plex Web → Settings |
 | `PLEX_TOKEN` | Plex authentication token | — | Plex Web → Settings → Troubleshooting (or `X-Plex-Token` header in DevTools) |

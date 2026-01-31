@@ -19,9 +19,9 @@ class SimklSource(BaseSource):
 
     BASE_URL = "https://api.simkl.com"
 
-    def __init__(self, client_id: str, token_file: Path, port: int = 19877):
+    def __init__(self, client_id: str, client_secret: str, token_file: Path, port: int = 19877):
         self.client_id = client_id
-        self.oauth = SimklOAuth(client_id, token_file, port=port)
+        self.oauth = SimklOAuth(client_id, client_secret, token_file, port=port)
         self.session = requests.Session()
         self._access_token: Optional[str] = None
 

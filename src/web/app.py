@@ -268,7 +268,7 @@ async def auth_start():
     if _oauth_state["status"] == "pending" and _oauth_instance:
         return {"status": "pending", "auth_url": _oauth_instance.get_auth_url()}
 
-    _oauth_instance = SimklOAuth(Config.SIMKL_CLIENT_ID, Config.SIMKL_TOKEN_FILE, port=Config.OAUTH_PORT)
+    _oauth_instance = SimklOAuth(Config.SIMKL_CLIENT_ID, Config.SIMKL_CLIENT_SECRET, Config.SIMKL_TOKEN_FILE, port=Config.OAUTH_PORT)
     try:
         _oauth_instance.start_callback_server()
     except OSError as e:
@@ -286,8 +286,9 @@ async def auth_start():
             _oauth_state = {"status": "success", "error": None}
             logger.info("Simkl OAuth authentication successful")
         else:
-            _oauth_state = {"status": "error", "error": "Aucun code reçu — autorisation annulée ou délai dépassé (5 min)"}
-            logger.error("Simkl OAuth: no authorization code received")
+            error = getattr(_oauth_instance, '_last_error', None) or "Erreur inconnue lors de l'authentification"
+            _oauth_state = {"status": "error", "error": error}
+            logger.error(f"Simkl OAuth failed: {error}")
 
     threading.Thread(target=wait_and_exchange, daemon=True).start()
 

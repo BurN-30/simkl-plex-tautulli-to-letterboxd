@@ -37,6 +37,7 @@ class SyncService:
             from src.sources.simkl import SimklSource
             return SimklSource(
                 client_id=Config.SIMKL_CLIENT_ID,
+                client_secret=Config.SIMKL_CLIENT_SECRET,
                 token_file=Config.SIMKL_TOKEN_FILE,
                 port=Config.OAUTH_PORT,
             )

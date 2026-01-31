@@ -21,6 +21,7 @@ class Config:
 
     # Simkl
     SIMKL_CLIENT_ID: str = os.getenv("SIMKL_CLIENT_ID", "")
+    SIMKL_CLIENT_SECRET: str = os.getenv("SIMKL_CLIENT_SECRET", "")
     SIMKL_TOKEN_FILE: Path = Path(os.getenv("SIMKL_TOKEN_FILE", ".simkl_token"))
 
     # Plex
@@ -48,7 +49,7 @@ class Config:
     OAUTH_PORT: int = int(_env("OAUTH_PORT", "19877"))
     SYNC_INTERVAL: int = int(_env("SYNC_INTERVAL", "15"))
 
-    _PLACEHOLDERS = {"your_client_id", "your_plex_token", "your_api_key", "your_tmdb_api_key"}
+    _PLACEHOLDERS = {"your_client_id", "your_client_secret", "your_plex_token", "your_api_key", "your_tmdb_api_key"}
 
     @classmethod
     def validate(cls) -> list[str]:
@@ -58,6 +59,8 @@ class Config:
         if cls.PRIMARY_SOURCE == "simkl":
             if not cls.SIMKL_CLIENT_ID or cls.SIMKL_CLIENT_ID in cls._PLACEHOLDERS:
                 errors.append("SIMKL_CLIENT_ID is required — replace the placeholder in .env (see simkl.com/settings/developer)")
+            if not cls.SIMKL_CLIENT_SECRET or cls.SIMKL_CLIENT_SECRET in cls._PLACEHOLDERS:
+                errors.append("SIMKL_CLIENT_SECRET is required — replace the placeholder in .env (see simkl.com/settings/developer)")
 
         if cls.PRIMARY_SOURCE == "plex":
             if not cls.PLEX_TOKEN or cls.PLEX_TOKEN in cls._PLACEHOLDERS:

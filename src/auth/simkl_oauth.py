@@ -60,12 +60,14 @@ class SimklOAuth:
     AUTH_URL = "https://simkl.com/oauth/authorize"
     TOKEN_URL = "https://api.simkl.com/oauth/token"
 
-    def __init__(self, client_id: str, token_file: Path, port: int = 19877):
+    def __init__(self, client_id: str, client_secret: str, token_file: Path, port: int = 19877):
         self.client_id = client_id
+        self.client_secret = client_secret
         self.token_file = token_file
         self.PORT = port
         self.REDIRECT_URI = f"http://localhost:{port}/callback"
         self._access_token: Optional[str] = None
+        self._last_error: Optional[str] = None
 
     @property
     def access_token(self) -> Optional[str]:
@@ -107,9 +109,13 @@ class SimklOAuth:
         self._server_thread.join(timeout=timeout)
         self._server.server_close()
         if not OAuthCallbackHandler.code:
+            self._last_error = "Aucun code reçu — autorisation annulée ou délai dépassé (5 min)"
             logger.error("No authorization code received (timeout or cancelled)")
             return None
-        return self._exchange_code(OAuthCallbackHandler.code)
+        token = self._exchange_code(OAuthCallbackHandler.code)
+        if not token and not self._last_error:
+            self._last_error = "Échange du code échoué — voir les logs du serveur"
+        return token
 
     def authenticate(self) -> Optional[str]:
         """
@@ -156,13 +162,18 @@ class SimklOAuth:
                 json={
                     "code": code,
                     "client_id": self.client_id,
+                    "client_secret": self.client_secret,
                     "redirect_uri": self.REDIRECT_URI,
                     "grant_type": "authorization_code",
                 },
                 timeout=30,
             )
-            response.raise_for_status()
             data = response.json()
+
+            if not response.ok:
+                self._last_error = f"Simkl a rejeté la requête: {data.get('message', data)}"
+                logger.error(f"Token exchange failed ({response.status_code}): {data}")
+                return None
 
             access_token = data.get("access_token")
             if access_token:
@@ -170,9 +181,11 @@ class SimklOAuth:
                 logger.info("Successfully obtained access token")
                 return access_token
             else:
+                self._last_error = f"Pas de token dans la réponse: {data}"
                 logger.error(f"No access token in response: {data}")
                 return None
 
         except requests.RequestException as e:
+            self._last_error = f"Erreur réseau lors de l'échange: {e}"
             logger.error(f"Failed to exchange code for token: {e}")
             return None
