@@ -7,20 +7,20 @@
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
     <div class="card p-6">
         <div class="text-4xl font-bold text-white mb-1">{{ stats.total_watched }}</div>
-        <div class="text-zinc-500 text-sm">Films Watched</div>
+        <div class="text-zinc-500 text-sm" data-i18n="stats.films_watched">Films Watched</div>
     </div>
     <div class="card p-6">
         <div class="text-4xl font-bold text-zinc-400 mb-1">{{ stats.total_watchlist }}</div>
-        <div class="text-zinc-500 text-sm">In Watchlist</div>
+        <div class="text-zinc-500 text-sm" data-i18n="stats.in_watchlist">In Watchlist</div>
     </div>
     <div class="card p-6">
         <div class="text-4xl font-bold text-amber-400 mb-1">{{ stats.average_rating }}</div>
-        <div class="text-zinc-500 text-sm">Average Rating</div>
+        <div class="text-zinc-500 text-sm" data-i18n="stats.avg_rating">Average Rating</div>
     </div>
     <div class="card p-6">
         {% set rated_count = stats.rating_distribution.values() | sum %}
         <div class="text-4xl font-bold text-emerald-400 mb-1">{{ rated_count }}</div>
-        <div class="text-zinc-500 text-sm">Rated Films</div>
+        <div class="text-zinc-500 text-sm" data-i18n="stats.rated_films">Rated Films</div>
     </div>
 </div>
 
@@ -28,7 +28,7 @@
 <div class="grid lg:grid-cols-2 gap-6 mb-8">
     <!-- Rating Distribution -->
     <div class="card p-6">
-        <h2 class="text-sm font-medium text-zinc-400 uppercase tracking-wide mb-5">Rating Distribution</h2>
+        <h2 class="text-sm font-medium text-zinc-400 uppercase tracking-wide mb-5" data-i18n="stats.rating_dist">Rating Distribution</h2>
         <div class="space-y-2">
             {% set max_count = stats.rating_distribution.values() | max if stats.rating_distribution.values() | list else 1 %}
             {% for rating in ['5', '4.5', '4', '3.5', '3', '2.5', '2', '1.5', '1', '0.5'] %}
@@ -47,7 +47,7 @@
 
     <!-- Movies by Month -->
     <div class="card p-6">
-        <h2 class="text-sm font-medium text-zinc-400 uppercase tracking-wide mb-5">Films Per Month</h2>
+        <h2 class="text-sm font-medium text-zinc-400 uppercase tracking-wide mb-5" data-i18n="stats.films_month">Films Per Month</h2>
         <div class="flex items-end gap-1 h-52">
             {% set max_month = stats.movies_by_month.values() | max if stats.movies_by_month.values() | list else 1 %}
             {% for month, count in stats.movies_by_month.items() | reverse %}
@@ -55,7 +55,7 @@
             <div class="flex-1 flex flex-col items-center group min-w-0">
                 <span class="text-xs text-zinc-400 mb-1 opacity-0 group-hover:opacity-100 transition">{{ count }}</span>
                 <div class="w-full bg-blue-500 rounded-t transition-all hover:bg-blue-400" style="height: {{ height }}%"></div>
-                <span class="text-xs text-zinc-600 mt-2 truncate w-full text-center" title="{{ month }}">{{ month[-2:] }}</span>
+                <span class="text-xs text-zinc-600 mt-2 truncate w-full text-center" title="{{ month }}" data-i18n-month="{{ month[-2:] }}">{{ month[-2:] }}</span>
             </div>
             {% endfor %}
         </div>
@@ -64,7 +64,7 @@
 
 <!-- Movies by Year -->
 <div class="card p-6">
-    <h2 class="text-sm font-medium text-zinc-400 uppercase tracking-wide mb-5">Films by Release Year</h2>
+    <h2 class="text-sm font-medium text-zinc-400 uppercase tracking-wide mb-5" data-i18n="stats.films_year">Films by Release Year</h2>
     <div class="flex items-end gap-1 h-48 overflow-x-auto pb-2">
         {% set max_year = stats.movies_by_year.values() | max if stats.movies_by_year.values() | list else 1 %}
         {% for year, count in stats.movies_by_year.items() | sort(reverse=true) %}

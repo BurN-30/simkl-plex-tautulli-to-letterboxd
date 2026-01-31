@@ -8,17 +8,17 @@
     <div class="flex items-center gap-6">
         <div class="flex items-center gap-2">
             <span class="text-2xl font-bold">{{ stats.total_watched }}</span>
-            <span class="text-zinc-500 text-sm">films</span>
+            <span class="text-zinc-500 text-sm" data-i18n="index.films">films</span>
         </div>
-        <div class="w-px h-6 bg-zinc-800"></div>
+        <div class="w-px h-6 divider"></div>
         <div class="flex items-center gap-2">
             <span class="text-xl font-semibold text-amber-400">{{ stats.average_rating }}</span>
-            <span class="text-zinc-500 text-sm">avg</span>
+            <span class="text-zinc-500 text-sm" data-i18n="index.avg">avg</span>
         </div>
-        <div class="w-px h-6 bg-zinc-800"></div>
+        <div class="w-px h-6 divider"></div>
         <div class="flex items-center gap-2">
             <span class="text-xl font-semibold text-zinc-400">{{ stats.total_watchlist }}</span>
-            <span class="text-zinc-500 text-sm">watchlist</span>
+            <span class="text-zinc-500 text-sm" data-i18n="index.watchlist">watchlist</span>
         </div>
     </div>
 
@@ -27,23 +27,23 @@
             <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
             </svg>
-            <input type="text" id="search-input" placeholder="Search..." class="input pl-9 w-48">
+            <input type="text" id="search-input" data-i18n-placeholder="index.search" placeholder="Search..." class="input pl-9 w-48">
         </div>
         <select id="year-filter" class="input">
-            <option value="">Year</option>
+            <option value="" data-i18n="index.year">Year</option>
             {% for year in years %}<option value="{{ year }}">{{ year }}</option>{% endfor %}
         </select>
         <select id="rating-filter" class="input">
-            <option value="">Rating</option>
+            <option value="" data-i18n="index.rating">Rating</option>
             <option value="5">5★</option>
             <option value="4">4★+</option>
             <option value="3">3★+</option>
         </select>
         <select id="sort-select" class="input">
-            <option value="watched_date-desc">Recent</option>
-            <option value="rating-desc">Top Rated</option>
-            <option value="year-desc">Newest</option>
-            <option value="title-asc">A-Z</option>
+            <option value="watched_date-desc" data-i18n="index.sort_recent">Recent</option>
+            <option value="rating-desc" data-i18n="index.sort_top">Top Rated</option>
+            <option value="year-desc" data-i18n="index.sort_newest">Newest</option>
+            <option value="title-asc" data-i18n="index.sort_az">A-Z</option>
         </select>
     </div>
 </div>
@@ -51,7 +51,7 @@
 <!-- Recently Watched -->
 <section class="mb-8">
     <div class="flex items-center justify-between mb-3">
-        <h2 class="text-sm font-medium text-zinc-400 uppercase tracking-wide">Recently Watched</h2>
+        <h2 class="text-sm font-medium text-zinc-400 uppercase tracking-wide" data-i18n="index.recently_watched">Recently Watched</h2>
         <div class="flex gap-1">
             <button onclick="scrollCarousel('recent', -1)" class="p-1.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-white">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -67,7 +67,7 @@
 <!-- Top Rated -->
 <section class="mb-8">
     <div class="flex items-center justify-between mb-3">
-        <h2 class="text-sm font-medium text-zinc-400 uppercase tracking-wide">Top Rated</h2>
+        <h2 class="text-sm font-medium text-zinc-400 uppercase tracking-wide" data-i18n="index.top_rated">Top Rated</h2>
         <div class="flex gap-1">
             <button onclick="scrollCarousel('toprated', -1)" class="p-1.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-white">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -83,7 +83,7 @@
 <!-- All Films Grid -->
 <section>
     <div class="flex items-center justify-between mb-3">
-        <h2 class="text-sm font-medium text-zinc-400 uppercase tracking-wide">All Films <span id="movies-count" class="text-zinc-600"></span></h2>
+        <h2 class="text-sm font-medium text-zinc-400 uppercase tracking-wide"><span data-i18n="index.all_films">All Films</span> <span id="movies-count" class="text-zinc-600"></span></h2>
     </div>
     <div id="movies-grid" class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));"></div>
     <div id="loading" class="hidden text-center py-10 text-zinc-500"><div class="spinner mx-auto"></div></div>
@@ -100,7 +100,9 @@
 
     function formatDate(d) {
         if (!d) return '';
-        return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+        const date = new Date(d + 'T00:00:00');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        return date.getDate() + ' ' + t('month.' + month);
     }
 
     function stars(r) {
@@ -179,7 +181,7 @@
             document.getElementById('movies-count').textContent = `(${data.total})`;
             render();
         } catch (e) {
-            showToast('Failed to load');
+            showToast(t('index.load_failed'));
         }
 
         document.getElementById('loading').classList.add('hidden');

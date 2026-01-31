@@ -6,7 +6,7 @@
 <!-- Header -->
 <div class="flex items-center justify-between mb-6">
     <div class="flex items-center gap-4">
-        <h1 class="text-xl font-semibold">Watchlist</h1>
+        <h1 class="text-xl font-semibold" data-i18n="watchlist.title">Watchlist</h1>
         <span id="watchlist-count" class="text-zinc-500"></span>
     </div>
     <div class="flex items-center gap-3">
@@ -14,9 +14,9 @@
             <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
             </svg>
-            <input type="text" id="search-input" placeholder="Search..." class="input pl-9 w-48">
+            <input type="text" id="search-input" data-i18n-placeholder="watchlist.search" placeholder="Search..." class="input pl-9 w-48">
         </div>
-        <a href="/api/export/csv?watched=false&watchlist=true" class="btn btn-ghost">Export</a>
+        <a href="/api/export/csv?watched=false&watchlist=true" class="btn btn-ghost" data-i18n="watchlist.export">Export</a>
     </div>
 </div>
 
@@ -25,12 +25,12 @@
 
 <div id="loading" class="hidden text-center py-12 text-zinc-500">
     <div class="spinner mx-auto mb-2"></div>
-    Loading...
+    <span data-i18n="watchlist.loading">Loading...</span>
 </div>
 
 <div id="empty-state" class="hidden text-center py-20 text-zinc-500">
     <div class="text-4xl mb-3">🎬</div>
-    <div>Your watchlist is empty</div>
+    <div data-i18n="watchlist.empty">Your watchlist is empty</div>
 </div>
 {% endblock %}
 
@@ -79,7 +79,7 @@
                 }).join('');
             }
         } catch (e) {
-            showToast('Failed to load');
+            showToast(t('watchlist.load_failed'));
         }
 
         document.getElementById('loading').classList.add('hidden');

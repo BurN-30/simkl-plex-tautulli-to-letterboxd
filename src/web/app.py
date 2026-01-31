@@ -261,7 +261,7 @@ async def auth_start():
         return {"status": "already_authenticated"}
 
     if not Config.SIMKL_CLIENT_ID:
-        _oauth_state = {"status": "error", "error": "SIMKL_CLIENT_ID non configuré dans .env"}
+        _oauth_state = {"status": "error", "error": "SIMKL_CLIENT_ID not configured in .env"}
         return {"status": "error", "error": _oauth_state["error"]}
 
     # Already pending — return existing auth URL
@@ -273,7 +273,7 @@ async def auth_start():
         _oauth_instance.start_callback_server()
     except OSError as e:
         _oauth_instance = None
-        _oauth_state = {"status": "error", "error": f"Port {Config.OAUTH_PORT} occupé — changez OAUTH_PORT dans .env ({e})"}
+        _oauth_state = {"status": "error", "error": f"Port {Config.OAUTH_PORT} in use — change OAUTH_PORT in .env ({e})"}
         return {"status": "error", "error": _oauth_state["error"]}
 
     _oauth_state = {"status": "pending", "error": None}
@@ -286,7 +286,7 @@ async def auth_start():
             _oauth_state = {"status": "success", "error": None}
             logger.info("Simkl OAuth authentication successful")
         else:
-            error = getattr(_oauth_instance, '_last_error', None) or "Erreur inconnue lors de l'authentification"
+            error = getattr(_oauth_instance, '_last_error', None) or "Unknown authentication error"
             _oauth_state = {"status": "error", "error": error}
             logger.error(f"Simkl OAuth failed: {error}")
 

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Simkl to Letterboxd{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%230a0a0b' stroke='%233b82f6' stroke-width='2'/%3E%3Cpolygon points='13,10 23,16 13,22' fill='%233b82f6'/%3E%3C/svg%3E">
+    <!-- Apply theme immediately to prevent flash -->
+    <script>(function(){var p=localStorage.getItem('theme')||'system';var t=p==='system'?(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):p;document.documentElement.setAttribute('data-theme',t);})()</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,91 +15,116 @@
             theme: {
                 extend: {
                     fontFamily: { 'sans': ['Inter', 'system-ui', 'sans-serif'] },
-                    colors: {
-                        'bg': { 'primary': '#0a0a0b', 'secondary': '#111113', 'tertiary': '#18181b' },
-                        'border': { 'default': '#27272a', 'hover': '#3f3f46' },
-                        'accent': { 'primary': '#3b82f6', 'green': '#22c55e', 'amber': '#f59e0b' }
-                    }
                 }
             }
         }
     </script>
     <style>
-        body { background: #0a0a0b; }
+        /* === Theme variables === */
+        :root, [data-theme="dark"] {
+            --bg-primary: #0a0a0b;
+            --bg-primary-95: rgba(10,10,11,0.95);
+            --bg-secondary: #111113;
+            --bg-tertiary: #18181b;
+            --border: #27272a;
+            --border-hover: #3f3f46;
+            --text-primary: #f4f4f5;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --text-subtle: #52525b;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --auth-banner-bg: #1a1a1f;
+        }
+        [data-theme="light"] {
+            --bg-primary: #f8fafc;
+            --bg-primary-95: rgba(248,250,252,0.95);
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f1f5f9;
+            --border: #e2e8f0;
+            --border-hover: #94a3b8;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --text-subtle: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --auth-banner-bg: #fef3c7;
+        }
 
-        .card {
-            background: #111113;
-            border: 1px solid #27272a;
-            border-radius: 8px;
-        }
-        .card:hover { border-color: #3f3f46; }
+        /* === Tailwind zinc overrides (themed) === */
+        .text-white { color: var(--text-primary) !important; }
+        .text-zinc-100, .text-zinc-200 { color: var(--text-primary) !important; }
+        .text-zinc-300, .text-zinc-400 { color: var(--text-secondary) !important; }
+        .text-zinc-500 { color: var(--text-muted) !important; }
+        .text-zinc-600 { color: var(--text-subtle) !important; }
+        .bg-zinc-800 { background-color: var(--bg-tertiary) !important; }
+        .border-zinc-600 { border-color: var(--border-hover) !important; }
+        .border-zinc-800 { border-color: var(--border) !important; }
+        .hover\:bg-zinc-800:hover { background-color: var(--bg-tertiary) !important; }
+        .hover\:text-white:hover { color: var(--text-primary) !important; }
+        .group:hover .group-hover\:text-white { color: var(--text-primary) !important; }
 
-        .poster {
-            position: relative;
-            border-radius: 6px;
-            overflow: hidden;
-            background: #18181b;
-        }
-        .poster::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 40%, transparent 70%);
-        }
-        .poster-info {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 10px;
-            z-index: 10;
-        }
+        /* === Base === */
+        body { background: var(--bg-primary); color: var(--text-primary); }
+
+        /* === Components === */
+        .card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; }
+        .card:hover { border-color: var(--border-hover); }
+
+        .poster { position: relative; border-radius: 6px; overflow: hidden; background: var(--bg-tertiary); }
+        .poster::after { content:''; position:absolute; inset:0; background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 40%, transparent 70%); }
+        .poster-info { position:absolute; bottom:0; left:0; right:0; padding:10px; z-index:10; }
         .poster:hover { transform: scale(1.02); transition: transform 0.15s; }
 
-        .carousel { overflow-x: auto; scrollbar-width: none; scroll-snap-type: x mandatory; scroll-padding-left: 24px; }
-        .carousel::-webkit-scrollbar { display: none; }
-        .carousel-item { scroll-snap-align: start; flex-shrink: 0; }
+        .carousel { overflow-x:auto; scrollbar-width:none; scroll-snap-type: x mandatory; scroll-padding-left:24px; }
+        .carousel::-webkit-scrollbar { display:none; }
+        .carousel-item { scroll-snap-align:start; flex-shrink:0; }
+        @media (min-width:2560px) { .carousel-item.w-36 { width:180px; } }
+        @media (min-width:1920px) and (max-width:2559px) { .carousel-item.w-36 { width:160px; } }
 
-        /* Responsive grid - auto-fill based on screen */
-        @media (min-width: 2560px) { .carousel-item.w-36 { width: 180px; } }
-        @media (min-width: 1920px) and (max-width: 2559px) { .carousel-item.w-36 { width: 160px; } }
+        .btn { padding:6px 14px; border-radius:6px; font-size:13px; font-weight:500; transition: all 0.15s; }
+        .btn-primary { background: var(--accent); color:white; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-ghost { background:transparent; border: 1px solid var(--border); color: var(--text-secondary); }
+        .btn-ghost:hover { border-color: var(--border-hover); color: var(--text-primary); }
 
-        .btn { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; transition: all 0.15s; }
-        .btn-primary { background: #3b82f6; color: white; }
-        .btn-primary:hover { background: #2563eb; }
-        .btn-ghost { background: transparent; border: 1px solid #27272a; color: #a1a1aa; }
-        .btn-ghost:hover { border-color: #3f3f46; color: white; }
+        .input { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius:6px; padding:8px 12px; color: var(--text-primary); font-size:14px; }
+        .input:focus { outline:none; border-color: var(--accent); }
+        .input::placeholder { color: var(--text-subtle); }
+        select.input option { background: var(--bg-secondary); color: var(--text-primary); }
 
-        .input {
-            background: #18181b;
-            border: 1px solid #27272a;
-            border-radius: 6px;
-            padding: 8px 12px;
-            color: white;
-            font-size: 14px;
-        }
-        .input:focus { outline: none; border-color: #3b82f6; }
-        .input::placeholder { color: #52525b; }
+        .tag { display:inline-flex; align-items:center; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:500; }
+        .tag-green { background: rgba(34,197,94,0.15); color:#4ade80; }
+        .tag-amber { background: rgba(245,158,11,0.15); color:#fbbf24; }
 
-        .tag { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-        .tag-green { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
-        .tag-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        .icon-link { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:4px; transition: opacity 0.15s; opacity:0.85; }
+        .icon-link:hover { opacity:1; }
+        .icon-link img, .icon-link svg { width:14px; height:14px; }
+        .icon-lb { background:#00d735; }
+        .icon-imdb { background:#f5c518; }
+        .icon-tmdb { background:#01b4e4; }
 
-        .icon-link { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 4px; transition: opacity 0.15s; opacity: 0.85; }
-        .icon-link:hover { opacity: 1; }
-        .icon-link img, .icon-link svg { width: 14px; height: 14px; }
-        .icon-lb { background: #00d735; }
-        .icon-imdb { background: #f5c518; }
-        .icon-tmdb { background: #01b4e4; }
-
-        .stars { color: #fbbf24; letter-spacing: -1px; }
-        .spinner { width: 16px; height: 16px; border: 2px solid #27272a; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.6s linear infinite; }
+        .stars { color:#fbbf24; letter-spacing:-1px; }
+        .spinner { width:16px; height:16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius:50%; animation: spin 0.6s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        .header-bg { background: var(--bg-primary-95); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+        #auth-banner { background: var(--auth-banner-bg); }
+        .divider { background-color: var(--border); }
+
+        .settings-btn { padding:6px 12px; border-radius:6px; font-size:13px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); cursor:pointer; transition: all 0.15s; }
+        .settings-btn:hover { border-color: var(--border-hover); color: var(--text-primary); }
+        .settings-btn.active { border-color: var(--accent); background: rgba(59,130,246,0.1); color: var(--accent); }
+
+        input[type="checkbox"] { accent-color: var(--accent); }
+        [data-theme="dark"] input[type="date"], [data-theme="dark"] select { color-scheme: dark; }
+        [data-theme="light"] input[type="date"], [data-theme="light"] select { color-scheme: light; }
     </style>
 </head>
-<body class="text-zinc-100 font-sans min-h-screen">
+<body class="font-sans min-h-screen">
     <!-- Header -->
-    <header class="border-b border-zinc-800 sticky top-0 z-50 bg-bg-primary/95 backdrop-blur-sm">
+    <header class="border-b border-zinc-800 sticky top-0 z-50 header-bg">
         <div class="px-6 h-14 flex items-center justify-between">
             <div class="flex items-center gap-6">
                 <div class="flex items-center gap-3">
@@ -107,27 +134,30 @@
                     </a>
                 </div>
                 <nav class="flex gap-1">
-                    <a href="/" class="px-3 py-1.5 rounded text-sm {% if request.url.path == '/' %}bg-zinc-800 text-white{% else %}text-zinc-400 hover:text-white{% endif %}">Films</a>
-                    <a href="/watchlist" class="px-3 py-1.5 rounded text-sm {% if request.url.path == '/watchlist' %}bg-zinc-800 text-white{% else %}text-zinc-400 hover:text-white{% endif %}">Watchlist</a>
-                    <a href="/stats" class="px-3 py-1.5 rounded text-sm {% if request.url.path == '/stats' %}bg-zinc-800 text-white{% else %}text-zinc-400 hover:text-white{% endif %}">Stats</a>
+                    <a href="/" data-i18n="nav.films" class="px-3 py-1.5 rounded text-sm {% if request.url.path == '/' %}bg-zinc-800 text-white{% else %}text-zinc-400 hover:text-white{% endif %}">Films</a>
+                    <a href="/watchlist" data-i18n="nav.watchlist" class="px-3 py-1.5 rounded text-sm {% if request.url.path == '/watchlist' %}bg-zinc-800 text-white{% else %}text-zinc-400 hover:text-white{% endif %}">Watchlist</a>
+                    <a href="/stats" data-i18n="nav.stats" class="px-3 py-1.5 rounded text-sm {% if request.url.path == '/stats' %}bg-zinc-800 text-white{% else %}text-zinc-400 hover:text-white{% endif %}">Stats</a>
                 </nav>
             </div>
             <div class="flex items-center gap-3">
                 <div id="sync-status" class="flex items-center gap-2 text-sm text-zinc-500">
                     <span id="sync-indicator" class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    <span id="sync-text">Synced</span>
+                    <span id="sync-text" data-i18n="sync.synced">Synced</span>
                 </div>
-                <button id="sync-btn" onclick="triggerSync()" class="btn btn-primary">Sync</button>
-                <a href="/api/export/csv?watched=true" class="btn btn-ghost">Export</a>
+                <button id="sync-btn" onclick="triggerSync()" class="btn btn-primary" data-i18n="sync.btn">Sync</button>
+                <a href="/api/export/csv?watched=true" class="btn btn-ghost" data-i18n="header.export">Export</a>
+                <button onclick="openSettings()" class="btn btn-ghost" style="padding:6px 8px">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.826 3.31.077 3.279 1.835-.061 1.748 1.874 2.81 3.356 1.948 1.089-.628 2.419.191 2.186 1.441-.174.956-.174 1.943 0 2.898.233 1.25-1.097 2.069-2.186 1.441-1.482-.862-3.417.2-3.356 1.948.031 1.758-1.736 2.661-3.279 1.835-1.426-.691-2.924-.691-3.35 0-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.826-3.31-.077-3.279-1.835.061-1.748-1.874-2.81-3.356-1.948-1.089.628-2.419-.191-2.186-1.441.174-.956.174-1.943 0-2.898-.233-1.25 1.097-2.069 2.186-1.441 1.482.862 3.417-.2 3.356-1.948-.031-1.758 1.736-2.661 3.279-1.835 1.426.691 2.924.691 3.35 0z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
             </div>
         </div>
     </header>
 
     <!-- Auth Banner -->
-    <div id="auth-banner" class="hidden border-b border-amber-500/30 bg-zinc-900 px-6 py-3">
+    <div id="auth-banner" class="hidden border-b border-amber-500/30 px-6 py-3">
         <div class="flex items-center justify-center gap-4">
-            <span class="text-amber-400 text-sm">Connexion Simkl requise pour la synchronisation</span>
-            <button id="auth-btn" onclick="startAuth()" class="btn btn-primary" style="font-size:12px;padding:4px 10px">Connecter Simkl</button>
+            <span class="text-amber-400 text-sm" data-i18n="auth.required">Simkl connection required for sync</span>
+            <button id="auth-btn" onclick="startAuth()" class="btn btn-primary" style="font-size:12px;padding:4px 10px" data-i18n="auth.connect">Connect Simkl</button>
             <span id="auth-status-text" class="text-xs text-zinc-500 hidden"></span>
         </div>
     </div>
@@ -148,62 +178,196 @@
             <form id="edit-form" class="space-y-4">
                 <input type="hidden" id="edit-movie-id">
                 <div>
-                    <label class="block text-sm text-zinc-400 mb-1.5">Rating</label>
+                    <label class="block text-sm text-zinc-400 mb-1.5" data-i18n="modal.rating">Rating</label>
                     <div id="edit-rating" class="stars text-xl cursor-pointer" data-rating="0">
                         {% for i in range(1, 11) %}<span data-value="{{ i * 0.5 }}">★</span>{% endfor %}
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm text-zinc-400 mb-1.5">Watch Date</label>
+                    <label class="block text-sm text-zinc-400 mb-1.5" data-i18n="modal.watch_date">Watch Date</label>
                     <input type="date" id="edit-date" class="input w-full">
                 </div>
                 <div class="flex items-center gap-2">
                     <input type="checkbox" id="edit-rewatch" class="w-4 h-4 rounded bg-zinc-800 border-zinc-600">
-                    <label for="edit-rewatch" class="text-sm">Rewatch</label>
+                    <label for="edit-rewatch" class="text-sm" data-i18n="modal.rewatch">Rewatch</label>
                 </div>
                 <div>
-                    <label class="block text-sm text-zinc-400 mb-1.5">Tags</label>
+                    <label class="block text-sm text-zinc-400 mb-1.5" data-i18n="modal.tags">Tags</label>
                     <input type="text" id="edit-tags" class="input w-full" placeholder="horror, favorite">
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" onclick="closeModal()" class="btn btn-ghost">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" onclick="closeModal()" class="btn btn-ghost" data-i18n="modal.cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" data-i18n="modal.save">Save</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50">
+        <div class="card p-6 w-full max-w-xs mx-4">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-lg font-semibold" data-i18n="settings.title">Settings</h3>
+                <button onclick="closeSettings()" class="text-zinc-500 hover:text-white transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="mb-5">
+                <label class="block text-sm text-zinc-400 mb-2" data-i18n="settings.theme">Theme</label>
+                <div class="flex gap-2">
+                    <button class="settings-btn theme-btn" data-theme="dark" onclick="setTheme('dark')" data-i18n="settings.dark">Dark</button>
+                    <button class="settings-btn theme-btn" data-theme="light" onclick="setTheme('light')" data-i18n="settings.light">Light</button>
+                    <button class="settings-btn theme-btn" data-theme="system" onclick="setTheme('system')" data-i18n="settings.system">System</button>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm text-zinc-400 mb-2" data-i18n="settings.language">Language</label>
+                <div class="flex gap-2">
+                    <button class="settings-btn lang-btn" data-lang="en" onclick="setLang('en')">English</button>
+                    <button class="settings-btn lang-btn" data-lang="fr" onclick="setLang('fr')">Français</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        function showToast(msg, dur = 3000) {
-            const t = document.getElementById('toast');
-            document.getElementById('toast-message').textContent = msg;
-            t.classList.remove('translate-y-16', 'opacity-0');
-            setTimeout(() => t.classList.add('translate-y-16', 'opacity-0'), dur);
+        // === i18n ===
+        const i18n = {
+            en: {
+                'nav.films':'Films','nav.watchlist':'Watchlist','nav.stats':'Stats',
+                'sync.synced':'Synced','sync.syncing':'Syncing...','sync.btn':'Sync','sync.started':'Sync started','sync.failed':'Sync failed',
+                'header.export':'Export',
+                'auth.required':'Simkl connection required for sync','auth.connect':'Connect Simkl',
+                'auth.authorizing':'Authorize in the new window...','auth.connected':'Simkl connected',
+                'auth.timeout':'Timeout (5 min). Try again.','auth.network_error':'Network error — check that the server is running',
+                'modal.rating':'Rating','modal.watch_date':'Watch Date','modal.rewatch':'Rewatch','modal.tags':'Tags',
+                'modal.cancel':'Cancel','modal.save':'Save','modal.saved':'Saved',
+                'settings.title':'Settings','settings.theme':'Theme','settings.dark':'Dark','settings.light':'Light','settings.system':'System','settings.language':'Language',
+                'index.films':'films','index.avg':'avg','index.watchlist':'watchlist',
+                'index.search':'Search...','index.year':'Year','index.rating':'Rating',
+                'index.sort_recent':'Recent','index.sort_top':'Top Rated','index.sort_newest':'Newest','index.sort_az':'A-Z',
+                'index.recently_watched':'Recently Watched','index.top_rated':'Top Rated','index.all_films':'All Films','index.load_failed':'Failed to load',
+                'stats.films_watched':'Films Watched','stats.in_watchlist':'In Watchlist','stats.avg_rating':'Average Rating','stats.rated_films':'Rated Films',
+                'stats.rating_dist':'Rating Distribution','stats.films_month':'Films Per Month','stats.films_year':'Films by Release Year',
+                'watchlist.title':'Watchlist','watchlist.search':'Search...','watchlist.export':'Export',
+                'watchlist.loading':'Loading...','watchlist.empty':'Your watchlist is empty','watchlist.load_failed':'Failed to load',
+                'month.01':'Jan','month.02':'Feb','month.03':'Mar','month.04':'Apr','month.05':'May','month.06':'Jun',
+                'month.07':'Jul','month.08':'Aug','month.09':'Sep','month.10':'Oct','month.11':'Nov','month.12':'Dec',
+            },
+            fr: {
+                'nav.films':'Films','nav.watchlist':'Liste d\'attente','nav.stats':'Statistiques',
+                'sync.synced':'Synchronisé','sync.syncing':'Synchronisation...','sync.btn':'Sync','sync.started':'Sync lancé','sync.failed':'Échec du sync',
+                'header.export':'Exporter',
+                'auth.required':'Connexion Simkl requise pour la synchronisation','auth.connect':'Connecter Simkl',
+                'auth.authorizing':'Autorisez dans la nouvelle fenêtre...','auth.connected':'Simkl connecté',
+                'auth.timeout':'Délai dépassé (5 min). Réessayez.','auth.network_error':'Erreur réseau — vérifiez que le serveur est en cours d\'exécution',
+                'modal.rating':'Note','modal.watch_date':'Date de visionnage','modal.rewatch':'Revoir','modal.tags':'Tags',
+                'modal.cancel':'Annuler','modal.save':'Sauvegarder','modal.saved':'Sauvegardé',
+                'settings.title':'Paramètres','settings.theme':'Thème','settings.dark':'Sombre','settings.light':'Clair','settings.system':'Système','settings.language':'Langue',
+                'index.films':'films','index.avg':'moy.','index.watchlist':'à voir',
+                'index.search':'Recherche...','index.year':'Année','index.rating':'Note',
+                'index.sort_recent':'Récent','index.sort_top':'Mieux notés','index.sort_newest':'Plus récents','index.sort_az':'A-Z',
+                'index.recently_watched':'Récemment regardés','index.top_rated':'Mieux notés','index.all_films':'Tous les films','index.load_failed':'Échec du chargement',
+                'stats.films_watched':'Films regardés','stats.in_watchlist':'À voir','stats.avg_rating':'Note moyenne','stats.rated_films':'Films notés',
+                'stats.rating_dist':'Distribution des notes','stats.films_month':'Films par mois','stats.films_year':'Films par année de sortie',
+                'watchlist.title':'Liste d\'attente','watchlist.search':'Recherche...','watchlist.export':'Exporter',
+                'watchlist.loading':'Chargement...','watchlist.empty':'Votre liste d\'attente est vide','watchlist.load_failed':'Échec du chargement',
+                'month.01':'jan.','month.02':'fév.','month.03':'mars','month.04':'avr.','month.05':'mai','month.06':'juin',
+                'month.07':'juil.','month.08':'août','month.09':'sep.','month.10':'oct.','month.11':'nov.','month.12':'déc.',
+            }
+        };
+
+        function t(key) {
+            const lang = localStorage.getItem('lang') || 'en';
+            return i18n[lang]?.[key] || i18n.en[key] || key;
         }
 
+        function applyI18n() {
+            document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+            document.querySelectorAll('[data-i18n-month]').forEach(el => { el.textContent = t('month.' + el.dataset.i18nMonth); });
+        }
+
+        // === Theme ===
+        function applyTheme() {
+            const pref = localStorage.getItem('theme') || 'system';
+            const theme = pref === 'system'
+                ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                : pref;
+            document.documentElement.setAttribute('data-theme', theme);
+        }
+
+        function setTheme(theme) {
+            localStorage.setItem('theme', theme);
+            applyTheme();
+            updateSettingsBtns();
+        }
+
+        function setLang(lang) {
+            localStorage.setItem('lang', lang);
+            applyI18n();
+            updateSettingsBtns();
+            if (typeof loadMovies === 'function') loadMovies();
+        }
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            if (localStorage.getItem('theme') === 'system') applyTheme();
+        });
+
+        // === Settings Modal ===
+        function openSettings() {
+            document.getElementById('settings-modal').classList.remove('hidden');
+            document.getElementById('settings-modal').classList.add('flex');
+            updateSettingsBtns();
+        }
+
+        function closeSettings() {
+            document.getElementById('settings-modal').classList.add('hidden');
+            document.getElementById('settings-modal').classList.remove('flex');
+        }
+
+        function updateSettingsBtns() {
+            const theme = localStorage.getItem('theme') || 'system';
+            const lang = localStorage.getItem('lang') || 'en';
+            document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
+            document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+        }
+
+        document.getElementById('settings-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSettings(); });
+
+        // === Toast ===
+        function showToast(msg, dur = 3000) {
+            const el = document.getElementById('toast');
+            document.getElementById('toast-message').textContent = msg;
+            el.classList.remove('translate-y-16', 'opacity-0');
+            setTimeout(() => el.classList.add('translate-y-16', 'opacity-0'), dur);
+        }
+
+        // === Sync ===
         async function triggerSync() {
             const btn = document.getElementById('sync-btn');
             const ind = document.getElementById('sync-indicator');
             const txt = document.getElementById('sync-text');
             btn.innerHTML = '<div class="spinner"></div>';
             ind.className = 'w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse';
-            txt.textContent = 'Syncing...';
+            txt.textContent = t('sync.syncing');
             try {
                 await fetch('/api/sync/trigger', { method: 'POST' });
-                showToast('Sync started');
+                showToast(t('sync.started'));
                 setTimeout(() => {
                     ind.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500';
-                    txt.textContent = 'Synced';
-                    btn.textContent = 'Sync';
+                    txt.textContent = t('sync.synced');
+                    btn.textContent = t('sync.btn');
                     if (typeof loadMovies === 'function') loadMovies();
                 }, 2000);
             } catch (e) {
-                showToast('Sync failed');
+                showToast(t('sync.failed'));
                 ind.className = 'w-1.5 h-1.5 rounded-full bg-red-500';
-                btn.textContent = 'Sync';
+                btn.textContent = t('sync.btn');
             }
         }
 
+        // === Edit Modal ===
         function openEditModal(movie) {
             document.getElementById('modal-title').textContent = movie.title;
             document.getElementById('edit-movie-id').value = movie.id;
@@ -244,13 +408,13 @@
                     tags: document.getElementById('edit-tags').value || null,
                 })
             });
-            if (res.ok) { showToast('Saved'); closeModal(); if (typeof loadMovies === 'function') loadMovies(); }
+            if (res.ok) { showToast(t('modal.saved')); closeModal(); if (typeof loadMovies === 'function') loadMovies(); }
         });
 
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeSettings(); } });
         document.getElementById('edit-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
 
-        // Simkl auth
+        // === Auth ===
         async function checkAuth() {
             try {
                 const res = await fetch('/api/auth/status');
@@ -298,7 +462,7 @@
                 if (data.auth_url) {
                     window.open(data.auth_url, '_blank');
                     statusEl.classList.remove('hidden');
-                    statusEl.textContent = 'Autorisez dans la nouvelle fenêtre...';
+                    statusEl.textContent = t('auth.authorizing');
 
                     _authPoll = setInterval(async () => {
                         try {
@@ -308,7 +472,7 @@
                                 clearInterval(_authPoll);
                                 _authPoll = null;
                                 document.getElementById('auth-banner').classList.add('hidden');
-                                showToast('Simkl connecté');
+                                showToast(t('auth.connected'));
                                 return;
                             }
                             if (d.oauth && d.oauth.status === 'error') {
@@ -319,15 +483,18 @@
 
                     setTimeout(() => {
                         if (_authPoll) {
-                            authError('Délai dépassé (5 min). Réessayez.');
+                            authError(t('auth.timeout'));
                         }
                     }, 300000);
                 }
             } catch (e) {
-                authError('Erreur réseau — vérifiez que le serveur est en cours d\'exécution');
+                authError(t('auth.network_error'));
             }
         }
 
+        // === Init ===
+        applyTheme();
+        applyI18n();
         checkAuth();
     </script>
     {% block scripts %}{% endblock %}
