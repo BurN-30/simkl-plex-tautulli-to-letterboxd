@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from src.config import Config
 from src.enrichment.tmdb import TMDBClient
 from src.exporters.letterboxd import LetterboxdExporter

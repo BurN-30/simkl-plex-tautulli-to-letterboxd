@@ -6,6 +6,8 @@ from pathlib import Path
 
 import uvicorn
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from src.config import Config
 
 # Setup logging
