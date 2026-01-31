@@ -240,7 +240,9 @@ _oauth_pending = False
 
 @app.get("/api/auth/status")
 async def auth_status():
-    """Check Simkl authentication status."""
+    """Check authentication status for the configured source."""
+    if Config.PRIMARY_SOURCE != "simkl":
+        return {"authenticated": True}
     return {"authenticated": Config.SIMKL_TOKEN_FILE.exists()}
 
 

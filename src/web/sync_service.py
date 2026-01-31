@@ -8,14 +8,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from src.config import Config
 from src.enrichment.tmdb import TMDBClient
-from src.sources.simkl import SimklSource
 from src.web.database import Database
 
 logger = logging.getLogger(__name__)
 
 
 class SyncService:
-    """Background service to sync with Simkl."""
+    """Background service to sync movies from the configured source."""
 
     def __init__(
         self,
@@ -28,11 +27,33 @@ class SyncService:
         self._is_syncing = False
 
         # Initialize clients
-        self.simkl = SimklSource(
-            client_id=Config.SIMKL_CLIENT_ID,
-            token_file=Config.SIMKL_TOKEN_FILE,
-        )
+        self.source = self._create_source()
         self.tmdb = TMDBClient(Config.TMDB_API_KEY)
+
+    def _create_source(self):
+        """Create the appropriate data source based on PRIMARY_SOURCE config."""
+        name = Config.PRIMARY_SOURCE
+        if name == "simkl":
+            from src.sources.simkl import SimklSource
+            return SimklSource(
+                client_id=Config.SIMKL_CLIENT_ID,
+                token_file=Config.SIMKL_TOKEN_FILE,
+            )
+        elif name == "plex":
+            from src.sources.plex import PlexSource
+            return PlexSource(
+                base_url=Config.PLEX_URL,
+                token=Config.PLEX_TOKEN,
+            )
+        elif name == "tautulli":
+            from src.sources.tautulli import TautulliSource
+            return TautulliSource(
+                base_url=Config.TAUTULLI_URL,
+                api_key=Config.TAUTULLI_API_KEY,
+                user_id=Config.TAUTULLI_USER_ID,
+            )
+        else:
+            raise ValueError(f"Unknown source: {name}")
 
     def start(self, interval_minutes: int = 15) -> None:
         """Start the background sync scheduler."""
@@ -62,18 +83,18 @@ class SyncService:
         self.db.update_sync_status(status="syncing", error_message=None)
 
         try:
-            logger.info("Starting Simkl sync...")
+            logger.info(f"Starting sync from {self.source.name}...")
 
             # Test connection
-            if not self.simkl.test_connection():
-                raise Exception("Failed to connect to Simkl")
+            if not self.source.test_connection():
+                raise Exception(f"Failed to connect to {self.source.name}")
 
             # Get watched movies
-            watched_entries = self.simkl.get_watched()
+            watched_entries = self.source.get_watched()
             logger.info(f"Fetched {len(watched_entries)} watched movies")
 
             # Get watchlist
-            watchlist_entries = self.simkl.get_watchlist()
+            watchlist_entries = self.source.get_watchlist()
             logger.info(f"Fetched {len(watchlist_entries)} watchlist movies")
 
             # Process watched movies
@@ -102,7 +123,7 @@ class SyncService:
                     "rewatch": entry.rewatch,
                     "is_watched": True,
                     "is_watchlist": False,
-                    "source": "simkl",
+                    "source": Config.PRIMARY_SOURCE,
                 }
                 self.db.upsert_movie(movie_data)
                 watched_count += 1
@@ -129,7 +150,7 @@ class SyncService:
                     "poster_url": poster_url,
                     "is_watched": False,
                     "is_watchlist": True,
-                    "source": "simkl",
+                    "source": Config.PRIMARY_SOURCE,
                 }
                 self.db.upsert_movie(movie_data)
                 watchlist_count += 1
