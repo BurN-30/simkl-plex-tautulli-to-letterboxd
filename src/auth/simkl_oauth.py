@@ -89,6 +89,28 @@ class SimklOAuth:
         self.token_file.write_text(json.dumps({"access_token": access_token}))
         logger.info(f"Token saved to {self.token_file}")
 
+    def get_auth_url(self) -> str:
+        """Get the authorization URL without opening browser."""
+        return f"{self.AUTH_URL}?response_type=code&client_id={self.client_id}&redirect_uri={self.REDIRECT_URI}"
+
+    def start_callback_server(self) -> None:
+        """Start the OAuth callback server in a background thread."""
+        OAuthCallbackHandler.code = None
+        self._server = socketserver.TCPServer(("", self.PORT), OAuthCallbackHandler)
+        self._server_thread = threading.Thread(target=self._server.handle_request)
+        self._server_thread.daemon = True
+        self._server_thread.start()
+        logger.info(f"OAuth callback server started on port {self.PORT}")
+
+    def wait_for_callback(self, timeout: int = 300) -> Optional[str]:
+        """Wait for OAuth callback and exchange code for token."""
+        self._server_thread.join(timeout=timeout)
+        self._server.server_close()
+        if not OAuthCallbackHandler.code:
+            logger.error("No authorization code received (timeout or cancelled)")
+            return None
+        return self._exchange_code(OAuthCallbackHandler.code)
+
     def authenticate(self) -> Optional[str]:
         """
         Perform OAuth authentication flow.

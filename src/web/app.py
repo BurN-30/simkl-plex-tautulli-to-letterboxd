@@ -232,6 +232,54 @@ async def trigger_sync():
     return {"status": "started", "message": "Sync started"}
 
 
+# ============== Auth Endpoints ==============
+
+_oauth_instance = None
+_oauth_pending = False
+
+
+@app.get("/api/auth/status")
+async def auth_status():
+    """Check Simkl authentication status."""
+    return {"authenticated": Config.SIMKL_TOKEN_FILE.exists()}
+
+
+@app.post("/api/auth/start")
+async def auth_start():
+    """Start Simkl OAuth flow. Returns auth URL to open in browser."""
+    global _oauth_instance, _oauth_pending
+    import threading
+    from src.auth.simkl_oauth import SimklOAuth
+
+    if Config.SIMKL_TOKEN_FILE.exists():
+        return {"status": "already_authenticated"}
+
+    if not Config.SIMKL_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="SIMKL_CLIENT_ID not configured")
+
+    if _oauth_pending and _oauth_instance:
+        return {"status": "pending", "auth_url": _oauth_instance.get_auth_url()}
+
+    _oauth_instance = SimklOAuth(Config.SIMKL_CLIENT_ID, Config.SIMKL_TOKEN_FILE)
+    _oauth_instance.start_callback_server()
+    _oauth_pending = True
+
+    def wait_and_exchange():
+        global _oauth_pending
+        token = _oauth_instance.wait_for_callback(timeout=300)
+        _oauth_pending = False
+        if token:
+            logger.info("Simkl OAuth authentication successful")
+        else:
+            logger.error("Simkl OAuth authentication failed or timed out")
+
+    threading.Thread(target=wait_and_exchange, daemon=True).start()
+
+    return {"status": "pending", "auth_url": _oauth_instance.get_auth_url()}
+
+
+# ============== Export ==============
+
 @app.get("/api/export/csv")
 async def export_csv(
     watched: bool = Query(True),
