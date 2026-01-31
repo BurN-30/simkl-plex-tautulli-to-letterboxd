@@ -39,8 +39,8 @@ class Config:
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
     # Web interface
-    WEB_PORT: int = int(os.getenv("WEB_PORT", "19876"))
-    SYNC_INTERVAL: int = int(os.getenv("SYNC_INTERVAL", "15"))  # minutes
+    WEB_PORT: int = int(os.getenv("WEB_PORT", "19876").split("#")[0].strip())
+    SYNC_INTERVAL: int = int(os.getenv("SYNC_INTERVAL", "15").split("#")[0].strip())
 
     @classmethod
     def validate(cls) -> list[str]:
