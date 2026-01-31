@@ -48,22 +48,27 @@ class Config:
     OAUTH_PORT: int = int(_env("OAUTH_PORT", "19877"))
     SYNC_INTERVAL: int = int(_env("SYNC_INTERVAL", "15"))
 
+    _PLACEHOLDERS = {"your_client_id", "your_plex_token", "your_api_key", "your_tmdb_api_key"}
+
     @classmethod
     def validate(cls) -> list[str]:
         """Validate required configuration. Returns list of errors."""
         errors = []
 
-        if cls.PRIMARY_SOURCE == "simkl" and not cls.SIMKL_CLIENT_ID:
-            errors.append("SIMKL_CLIENT_ID is required when using Simkl source")
+        if cls.PRIMARY_SOURCE == "simkl":
+            if not cls.SIMKL_CLIENT_ID or cls.SIMKL_CLIENT_ID in cls._PLACEHOLDERS:
+                errors.append("SIMKL_CLIENT_ID is required — replace the placeholder in .env (see simkl.com/settings/developer)")
 
-        if cls.PRIMARY_SOURCE == "plex" and not cls.PLEX_TOKEN:
-            errors.append("PLEX_TOKEN is required when using Plex source")
+        if cls.PRIMARY_SOURCE == "plex":
+            if not cls.PLEX_TOKEN or cls.PLEX_TOKEN in cls._PLACEHOLDERS:
+                errors.append("PLEX_TOKEN is required — replace the placeholder in .env")
 
-        if cls.PRIMARY_SOURCE == "tautulli" and not cls.TAUTULLI_API_KEY:
-            errors.append("TAUTULLI_API_KEY is required when using Tautulli source")
+        if cls.PRIMARY_SOURCE == "tautulli":
+            if not cls.TAUTULLI_API_KEY or cls.TAUTULLI_API_KEY in cls._PLACEHOLDERS:
+                errors.append("TAUTULLI_API_KEY is required — replace the placeholder in .env")
 
-        if not cls.TMDB_API_KEY:
-            errors.append("TMDB_API_KEY is required for enrichment")
+        if not cls.TMDB_API_KEY or cls.TMDB_API_KEY in cls._PLACEHOLDERS:
+            errors.append("TMDB_API_KEY is required — replace the placeholder in .env (see themoviedb.org/settings/api)")
 
         return errors
 
