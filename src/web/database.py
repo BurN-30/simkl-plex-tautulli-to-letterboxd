@@ -1,8 +1,27 @@
 """Database models and operations using SQLAlchemy."""
 
-from datetime import date, datetime
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+
+def utcnow() -> datetime:
+    """Naive UTC timestamp, matching the naive DateTime columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+@dataclass
+class SyncSummary:
+    """Detached snapshot of :class:`SyncStatus`, safe to read after commit."""
+
+    last_sync: Optional[datetime] = None
+    movies_count: int = 0
+    watchlist_count: int = 0
+    status: str = "idle"
+    error_message: Optional[str] = None
+    last_export: Optional[datetime] = None
+    last_confirm: Optional[datetime] = None
 
 from sqlalchemy import (
     Boolean,
@@ -13,10 +32,15 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     create_engine,
     func,
+    inspect,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+
+from src.models import Movie, WatchEntry, WatchlistEntry, normalize_tags
 
 
 class Base(DeclarativeBase):
@@ -31,6 +55,8 @@ class MovieDB(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     tmdb_id = Column(Integer, unique=True, nullable=True, index=True)
     imdb_id = Column(String(20), unique=True, nullable=True, index=True)
+    simkl_id = Column(Integer, unique=True, nullable=True, index=True)
+    letterboxd_slug = Column(String(200), nullable=True)
     title = Column(String(500), nullable=False, index=True)
     year = Column(Integer, nullable=True)
     directors = Column(String(500), nullable=True)
@@ -38,7 +64,10 @@ class MovieDB(Base):
 
     # Watch info
     watched_date = Column(Date, nullable=True)
-    rating = Column(Float, nullable=True)  # 0.5-5.0 scale
+    # rating10 (1-10) is what Simkl gives and what the CSV exports; rating
+    # (0.5-5.0) is derived from it for the dashboard and the statistics.
+    rating10 = Column(Integer, nullable=True)
+    rating = Column(Float, nullable=True)
     rewatch = Column(Boolean, default=False)
     tags = Column(String(500), nullable=True)
     review = Column(Text, nullable=True)
@@ -48,8 +77,8 @@ class MovieDB(Base):
     is_watchlist = Column(Boolean, default=False)
 
     # Metadata
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     source = Column(String(50), default="simkl")
 
     @property
@@ -79,11 +108,14 @@ class MovieDB(Base):
             "id": self.id,
             "tmdb_id": self.tmdb_id,
             "imdb_id": self.imdb_id,
+            "simkl_id": self.simkl_id,
+            "letterboxd_slug": self.letterboxd_slug,
             "title": self.title,
             "year": self.year,
             "directors": self.directors,
             "poster_url": self.poster_url,
             "watched_date": self.watched_date.isoformat() if self.watched_date else None,
+            "rating10": self.rating10,
             "rating": self.rating,
             "rewatch": self.rewatch,
             "tags": self.tags,
@@ -110,19 +142,78 @@ class SyncStatus(Base):
     watchlist_count = Column(Integer, default=0)
     status = Column(String(50), default="idle")  # idle, syncing, error
     error_message = Column(Text, nullable=True)
+    last_export = Column(DateTime, nullable=True)
+    last_confirm = Column(DateTime, nullable=True)
+
+
+class ExportState(Base):
+    """Last confirmed state of a Letterboxd diary entry.
+
+    One row per importable entry, keyed on (film, WatchedDate) because that is
+    exactly the pair the Letterboxd importer matches on when it decides to
+    update an existing diary entry instead of creating one.
+
+    ``fingerprint`` is the hash of the user data (rating, review, rewatch,
+    tags) as it was in the CSV file that was confirmed as imported. An entry is
+    "pending" when it has no row here, or when its current fingerprint differs
+    from the stored one.
+    """
+
+    __tablename__ = "export_state"
+    __table_args__ = (UniqueConstraint("film_key", "watched_date", name="uq_export_entry"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    film_key = Column(String(200), nullable=False, index=True)
+    #  Empty string for an entry without a watch date (rating-only line).
+    watched_date = Column(String(10), nullable=False, default="")
+    fingerprint = Column(String(64), nullable=False)
+    confirmed_at = Column(DateTime, nullable=False, default=utcnow)
+    source_file = Column(String(300), nullable=True)
 
 
 class Database:
     """Database operations."""
 
     def __init__(self, db_path: Path = Path("data/movies.db")):
+        db_path = Path(db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self.engine = create_engine(f"sqlite:///{db_path}", echo=False)
         Base.metadata.create_all(self.engine)
+        self._migrate()
         self.SessionLocal = sessionmaker(bind=self.engine)
+
+    def _migrate(self) -> None:
+        """Add columns introduced after a database was first created.
+
+        SQLite cannot alter a table in place beyond adding columns, which is
+        all this schema has ever needed.
+        """
+        inspector = inspect(self.engine)
+        for table in Base.metadata.sorted_tables:
+            if not inspector.has_table(table.name):
+                continue
+            existing = {column["name"] for column in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in existing:
+                    continue
+                column_type = column.type.compile(self.engine.dialect)
+                with self.engine.begin() as connection:
+                    connection.execute(
+                        text(f'ALTER TABLE {table.name} ADD COLUMN "{column.name}" {column_type}')
+                    )
 
     def get_session(self) -> Session:
         return self.SessionLocal()
+
+    def close(self) -> None:
+        """Release the SQLite file handle (Windows keeps it locked otherwise)."""
+        self.engine.dispose()
+
+    def __enter__(self) -> "Database":
+        return self
+
+    def __exit__(self, *exc_info) -> None:
+        self.close()
 
     def get_all_movies(
         self,
@@ -173,35 +264,62 @@ class Database:
         with self.get_session() as session:
             return session.query(MovieDB).filter(MovieDB.tmdb_id == tmdb_id).first()
 
-    def upsert_movie(self, movie_data: dict) -> MovieDB:
-        """Insert or update a movie."""
+    def find_movie(self, session: Session, movie_data: dict) -> Optional[MovieDB]:
+        """Locate an existing row for a movie, by id then by title and year."""
+        for column, key in (
+            (MovieDB.simkl_id, "simkl_id"),
+            (MovieDB.tmdb_id, "tmdb_id"),
+            (MovieDB.imdb_id, "imdb_id"),
+        ):
+            value = movie_data.get(key)
+            if value:
+                found = session.query(MovieDB).filter(column == value).first()
+                if found:
+                    return found
+
+        title = movie_data.get("title")
+        if title:
+            return (
+                session.query(MovieDB)
+                .filter(
+                    MovieDB.title == title,
+                    MovieDB.year == movie_data.get("year"),
+                    MovieDB.tmdb_id.is_(None),
+                    MovieDB.imdb_id.is_(None),
+                )
+                .first()
+            )
+        return None
+
+    def upsert_movie(self, movie_data: dict, protect_user_fields: bool = True) -> MovieDB:
+        """Insert or update a movie.
+
+        ``protect_user_fields`` keeps the review, tags and rewatch flag typed in
+        the dashboard from being wiped by a sync, since no source provides them.
+        """
+        protected = {"review", "tags", "rewatch"} if protect_user_fields else set()
+
         with self.get_session() as session:
-            # Try to find existing movie
-            existing = None
-            if movie_data.get("tmdb_id"):
-                existing = session.query(MovieDB).filter(
-                    MovieDB.tmdb_id == movie_data["tmdb_id"]
-                ).first()
-            elif movie_data.get("imdb_id"):
-                existing = session.query(MovieDB).filter(
-                    MovieDB.imdb_id == movie_data["imdb_id"]
-                ).first()
+            existing = self.find_movie(session, movie_data)
 
             if existing:
-                # Update existing
                 for key, value in movie_data.items():
-                    if hasattr(existing, key) and value is not None:
-                        setattr(existing, key, value)
+                    if not hasattr(existing, key):
+                        continue
+                    if key in protected:
+                        continue
+                    if value is None and key not in {"rating10", "rating", "watched_date"}:
+                        continue
+                    setattr(existing, key, value)
                 session.commit()
                 session.refresh(existing)
                 return existing
-            else:
-                # Create new
-                movie = MovieDB(**movie_data)
-                session.add(movie)
-                session.commit()
-                session.refresh(movie)
-                return movie
+
+            movie = MovieDB(**movie_data)
+            session.add(movie)
+            session.commit()
+            session.refresh(movie)
+            return movie
 
     def update_movie(self, movie_id: int, updates: dict) -> Optional[MovieDB]:
         """Update a movie by ID."""
@@ -279,15 +397,28 @@ class Database:
                 "movies_by_month": {m: c for m, c in movies_by_month if m},
             }
 
-    def get_sync_status(self) -> Optional[SyncStatus]:
-        """Get sync status."""
+    def get_sync_status(self) -> SyncSummary:
+        """Read the sync status as a detached snapshot.
+
+        Returning the ORM instance itself would raise ``DetachedInstanceError``
+        once the session closes, so the values are copied out.
+        """
         with self.get_session() as session:
             status = session.query(SyncStatus).first()
             if not status:
                 status = SyncStatus()
                 session.add(status)
                 session.commit()
-            return status
+                session.refresh(status)
+            return SyncSummary(
+                last_sync=status.last_sync,
+                movies_count=status.movies_count or 0,
+                watchlist_count=status.watchlist_count or 0,
+                status=status.status or "idle",
+                error_message=status.error_message,
+                last_export=status.last_export,
+                last_confirm=status.last_confirm,
+            )
 
     def update_sync_status(self, **kwargs) -> None:
         """Update sync status."""
@@ -333,3 +464,105 @@ class Database:
                 query = query.filter(MovieDB.title.ilike(f"%{search}%"))
 
             return query.scalar() or 0
+
+    # ---------------------------------------------------------------- entries
+
+    def _row_to_movie(self, row: MovieDB) -> Movie:
+        return Movie(
+            title=row.title,
+            year=row.year,
+            tmdb_id=row.tmdb_id,
+            imdb_id=row.imdb_id,
+            simkl_id=row.simkl_id,
+            letterboxd_slug=row.letterboxd_slug,
+            directors=normalize_tags(row.directors),
+        )
+
+    def get_watch_entries(self) -> list[WatchEntry]:
+        """Every watched film in the database, as exportable entries."""
+        with self.get_session() as session:
+            rows = (
+                session.query(MovieDB)
+                .filter(MovieDB.is_watched.is_(True))
+                .order_by(MovieDB.watched_date.asc().nullsfirst(), MovieDB.title.asc())
+                .all()
+            )
+            return [
+                WatchEntry(
+                    movie=self._row_to_movie(row),
+                    watched_date=row.watched_date,
+                    rating10=row.rating10,
+                    rewatch=bool(row.rewatch),
+                    tags=normalize_tags(row.tags),
+                    review=row.review,
+                )
+                for row in rows
+            ]
+
+    def get_watchlist_entries(self) -> list[WatchlistEntry]:
+        """Every watchlist film in the database."""
+        with self.get_session() as session:
+            rows = (
+                session.query(MovieDB)
+                .filter(MovieDB.is_watchlist.is_(True))
+                .order_by(MovieDB.title.asc())
+                .all()
+            )
+            return [WatchlistEntry(movie=self._row_to_movie(row)) for row in rows]
+
+    # ----------------------------------------------------------- export state
+
+    def get_export_state(self) -> dict[tuple[str, str], str]:
+        """Map (film key, watched date) to the last confirmed fingerprint."""
+        with self.get_session() as session:
+            return {
+                (row.film_key, row.watched_date or ""): row.fingerprint
+                for row in session.query(ExportState).all()
+            }
+
+    def mark_confirmed(
+        self,
+        records: list[tuple[str, str, str]],
+        source_file: Optional[str] = None,
+    ) -> tuple[int, int]:
+        """Record entries as imported. Returns (inserted, updated)."""
+        inserted = 0
+        updated = 0
+        now = utcnow()
+
+        with self.get_session() as session:
+            for film_key, watched_date, fingerprint in records:
+                watched_date = watched_date or ""
+                existing = (
+                    session.query(ExportState)
+                    .filter(
+                        ExportState.film_key == film_key,
+                        ExportState.watched_date == watched_date,
+                    )
+                    .first()
+                )
+                if existing:
+                    existing.fingerprint = fingerprint
+                    existing.confirmed_at = now
+                    existing.source_file = source_file
+                    updated += 1
+                else:
+                    session.add(
+                        ExportState(
+                            film_key=film_key,
+                            watched_date=watched_date,
+                            fingerprint=fingerprint,
+                            confirmed_at=now,
+                            source_file=source_file,
+                        )
+                    )
+                    inserted += 1
+            session.commit()
+
+        self.update_sync_status(last_confirm=now)
+        return inserted, updated
+
+    def count_export_state(self) -> int:
+        with self.get_session() as session:
+            return session.query(func.count(ExportState.id)).scalar() or 0
+

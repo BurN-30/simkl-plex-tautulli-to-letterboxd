@@ -1,218 +1,245 @@
-"""Letterboxd CSV exporter."""
+"""Build the CSV files that are handed to letterboxd.com/import."""
 
-import csv
+from __future__ import annotations
+
 import logging
-from datetime import date
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import Iterable, Optional, Sequence
 
-from src.models import Movie, WatchEntry, WatchlistEntry
+from src.letterboxd import csv_format
+from src.models import Movie, WatchEntry, WatchlistEntry, fingerprint_of, normalize_tags
 
 logger = logging.getLogger(__name__)
 
+#: Column layout for an import to the profile / diary.
+#:
+#: ``Rating10`` is used and ``Rating`` is deliberately absent: Letterboxd states
+#: that when both columns carry data, "whichever column appears second in the
+#: file will take precedence", so shipping only one removes the ambiguity.
+WATCHED_HEADERS: tuple[str, ...] = (
+    "tmdbID",
+    "imdbID",
+    "Title",
+    "Year",
+    "Directors",
+    "WatchedDate",
+    "Rating10",
+    "Rewatch",
+    "Tags",
+    "Review",
+)
+
+#: Column layout for an import to the watchlist.
+WATCHLIST_HEADERS: tuple[str, ...] = ("Title", "Year", "tmdbID", "imdbID")
+
+
+@dataclass
+class ExportResult:
+    """Outcome of one export run."""
+
+    kind: str
+    files: list[Path] = field(default_factory=list)
+    rows: int = 0
+    skipped_unchanged: int = 0
+    skipped_no_id: int = 0
+
+    @property
+    def total_bytes(self) -> int:
+        return sum(path.stat().st_size for path in self.files if path.exists())
+
+
+def watched_row(entry: WatchEntry) -> list[str]:
+    """Render one watched entry as CSV values."""
+    movie = entry.movie
+    return [
+        str(movie.tmdb_id) if movie.tmdb_id else "",
+        movie.imdb_id or "",
+        movie.title,
+        str(movie.year) if movie.year else "",
+        ", ".join(movie.directors) if movie.directors else "",
+        entry.watched_date.isoformat() if entry.watched_date else "",
+        str(entry.rating10) if entry.rating10 else "",
+        "true" if entry.rewatch else "false",
+        ", ".join(normalize_tags(entry.tags)),
+        entry.review or "",
+    ]
+
+
+def watchlist_row(entry: WatchlistEntry) -> list[str]:
+    """Render one watchlist entry as CSV values."""
+    movie = entry.movie
+    return [
+        movie.title,
+        str(movie.year) if movie.year else "",
+        str(movie.tmdb_id) if movie.tmdb_id else "",
+        movie.imdb_id or "",
+    ]
+
+
+def select_pending(
+    entries: Iterable[WatchEntry],
+    state: dict[tuple[str, str], str],
+) -> tuple[list[WatchEntry], int]:
+    """Split entries into those needing an import and those already confirmed.
+
+    An entry is pending when its (film, WatchedDate) pair has never been
+    confirmed, or when its user data changed since the last confirmation.
+    """
+    pending: list[WatchEntry] = []
+    unchanged = 0
+    for entry in entries:
+        confirmed = state.get(entry.state_key)
+        if confirmed is not None and confirmed == entry.fingerprint:
+            unchanged += 1
+        else:
+            pending.append(entry)
+    return pending, unchanged
+
+
+def _timestamp(moment: Optional[datetime] = None) -> str:
+    return (moment or datetime.now()).strftime("%Y%m%d-%H%M%S")
+
 
 class LetterboxdExporter:
-    """Export movies to Letterboxd-compatible CSV format."""
+    """Write import-ready CSV files into the pending directory."""
 
-    WATCHED_HEADERS = [
-        "imdbID",
-        "tmdbID",
-        "Title",
-        "Year",
-        "Directors",
-        "WatchedDate",
-        "Rating",
-        "Rewatch",
-        "Tags",
-        "Review",
-    ]
-
-    WATCHLIST_HEADERS = [
-        "imdbID",
-        "tmdbID",
-        "Title",
-        "Year",
-        "Directors",
-    ]
-
-    def __init__(self, output_dir: Path):
-        self.output_dir = output_dir
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(self, pending_dir: Path, max_bytes: int = csv_format.DEFAULT_MAX_FILE_BYTES):
+        self.pending_dir = Path(pending_dir)
+        self.max_bytes = max_bytes
 
     def export_watched(
-        self, entries: List[WatchEntry], filename: str = "letterboxd_watched.csv"
-    ) -> Path:
-        """
-        Export watched movies to CSV.
+        self,
+        entries: Sequence[WatchEntry],
+        state: Optional[dict[tuple[str, str], str]] = None,
+        moment: Optional[datetime] = None,
+    ) -> ExportResult:
+        """Export watched films, optionally filtered against the export state."""
+        result = ExportResult(kind="watched")
 
-        Args:
-            entries: List of WatchEntry objects
-            filename: Output filename
+        if state is None:
+            candidates = list(entries)
+        else:
+            candidates, result.skipped_unchanged = select_pending(entries, state)
 
-        Returns:
-            Path to the created CSV file
-        """
-        output_path = self.output_dir / filename
-        valid_entries = []
-        not_found = []
-
-        for entry in entries:
-            if entry.movie.tmdb_id or entry.movie.imdb_id:
-                valid_entries.append(entry)
+        exportable: list[WatchEntry] = []
+        for entry in candidates:
+            if entry.movie.has_exact_id or entry.movie.title.strip():
+                exportable.append(entry)
             else:
-                not_found.append(entry)
+                result.skipped_no_id += 1
 
-        # Write main CSV
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(self.WATCHED_HEADERS)
+        no_id = sum(1 for entry in exportable if not entry.movie.has_exact_id)
+        if no_id:
+            logger.warning(
+                "%d exported films have no TMDB or IMDb id; Letterboxd will "
+                "best-guess them from title and year, check them on the "
+                "confirmation screen",
+                no_id,
+            )
 
-            for entry in valid_entries:
-                row = self._format_watched_row(entry)
-                writer.writerow(row)
+        if not exportable:
+            logger.info("Nothing to export for watched films")
+            return result
 
-        logger.info(f"Exported {len(valid_entries)} watched movies to {output_path}")
-
-        # Write not found movies
-        if not_found:
-            self._export_not_found(not_found, "not_found_watched.csv")
-
-        return output_path
+        result.files = csv_format.write_chunked(
+            self.pending_dir,
+            f"letterboxd_watched_{_timestamp(moment)}",
+            WATCHED_HEADERS,
+            (watched_row(entry) for entry in exportable),
+            max_bytes=self.max_bytes,
+        )
+        result.rows = len(exportable)
+        logger.info(
+            "Exported %d watched entries to %d file(s) in %s",
+            result.rows,
+            len(result.files),
+            self.pending_dir,
+        )
+        return result
 
     def export_watchlist(
-        self, entries: List[WatchlistEntry], filename: str = "letterboxd_watchlist.csv"
-    ) -> Path:
-        """
-        Export watchlist to CSV.
+        self,
+        entries: Sequence[WatchlistEntry],
+        moment: Optional[datetime] = None,
+    ) -> ExportResult:
+        """Export the watchlist as its own file, for the watchlist importer."""
+        result = ExportResult(kind="watchlist")
+        exportable = [entry for entry in entries if entry.movie.title.strip()]
+        if not exportable:
+            logger.info("Nothing to export for the watchlist")
+            return result
 
-        Args:
-            entries: List of WatchlistEntry objects
-            filename: Output filename
-
-        Returns:
-            Path to the created CSV file
-        """
-        output_path = self.output_dir / filename
-        valid_entries = []
-        not_found = []
-
-        for entry in entries:
-            if entry.movie.tmdb_id or entry.movie.imdb_id:
-                valid_entries.append(entry)
-            else:
-                not_found.append(entry)
-
-        # Write main CSV
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(self.WATCHLIST_HEADERS)
-
-            for entry in valid_entries:
-                row = self._format_watchlist_row(entry)
-                writer.writerow(row)
-
-        logger.info(f"Exported {len(valid_entries)} watchlist movies to {output_path}")
-
-        # Write not found movies
-        if not_found:
-            self._export_not_found_watchlist(not_found, "not_found_watchlist.csv")
-
-        return output_path
-
-    def _format_watched_row(self, entry: WatchEntry) -> list:
-        """Format a WatchEntry as a CSV row."""
-        movie = entry.movie
-
-        # Format rating (0.5-5 scale, or empty)
-        rating_str = ""
-        if entry.rating is not None:
-            rating_str = str(entry.rating)
-
-        # Format date
-        date_str = ""
-        if entry.watched_date:
-            date_str = entry.watched_date.isoformat()
-
-        # Format directors
-        directors_str = ", ".join(movie.directors) if movie.directors else ""
-
-        # Format rewatch
-        rewatch_str = "true" if entry.rewatch else "false"
-
-        # Format tags
-        tags_str = ", ".join(entry.tags) if entry.tags else ""
-
-        return [
-            movie.imdb_id or "",
-            str(movie.tmdb_id) if movie.tmdb_id else "",
-            movie.title,
-            str(movie.year) if movie.year else "",
-            directors_str,
-            date_str,
-            rating_str,
-            rewatch_str,
-            tags_str,
-            entry.review or "",
-        ]
-
-    def _format_watchlist_row(self, entry: WatchlistEntry) -> list:
-        """Format a WatchlistEntry as a CSV row."""
-        movie = entry.movie
-
-        # Format directors
-        directors_str = ", ".join(movie.directors) if movie.directors else ""
-
-        return [
-            movie.imdb_id or "",
-            str(movie.tmdb_id) if movie.tmdb_id else "",
-            movie.title,
-            str(movie.year) if movie.year else "",
-            directors_str,
-        ]
-
-    def _export_not_found(
-        self, entries: List[WatchEntry], filename: str
-    ) -> None:
-        """Export entries that couldn't be matched to a separate CSV."""
-        output_path = self.output_dir / filename
-
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["Title", "Year", "WatchedDate", "Rating", "Reason"])
-
-            for entry in entries:
-                writer.writerow([
-                    entry.movie.title,
-                    entry.movie.year or "",
-                    entry.watched_date.isoformat() if entry.watched_date else "",
-                    entry.rating or "",
-                    "No TMDB/IMDB ID found",
-                ])
-
-        logger.warning(
-            f"{len(entries)} watched movies could not be matched. "
-            f"See {output_path}"
+        result.files = csv_format.write_chunked(
+            self.pending_dir,
+            f"letterboxd_watchlist_{_timestamp(moment)}",
+            WATCHLIST_HEADERS,
+            (watchlist_row(entry) for entry in exportable),
+            max_bytes=self.max_bytes,
         )
-
-    def _export_not_found_watchlist(
-        self, entries: List[WatchlistEntry], filename: str
-    ) -> None:
-        """Export watchlist entries that couldn't be matched."""
-        output_path = self.output_dir / filename
-
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["Title", "Year", "AddedDate", "Reason"])
-
-            for entry in entries:
-                writer.writerow([
-                    entry.movie.title,
-                    entry.movie.year or "",
-                    entry.added_date.isoformat() if entry.added_date else "",
-                    "No TMDB/IMDB ID found",
-                ])
-
-        logger.warning(
-            f"{len(entries)} watchlist movies could not be matched. "
-            f"See {output_path}"
+        result.rows = len(exportable)
+        logger.info(
+            "Exported %d watchlist films to %d file(s) in %s",
+            result.rows,
+            len(result.files),
+            self.pending_dir,
         )
+        return result
+
+
+def _parse_int(value: str) -> Optional[int]:
+    value = (value or "").strip()
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def read_confirmations(path: Path) -> list[tuple[str, str, str]]:
+    """Read back an exported CSV as (film key, watched date, fingerprint).
+
+    Parsing the file that was actually uploaded, rather than trusting a
+    side-channel, keeps ``confirm`` honest: whatever Letterboxd received is
+    what gets marked as imported.
+    """
+    path = Path(path)
+    text = path.read_text(encoding="utf-8")
+    rows = csv_format.parse_dicts(text)
+
+    records: list[tuple[str, str, str]] = []
+    for row in rows:
+        movie = Movie(
+            title=(row.get("Title") or "").strip(),
+            year=_parse_int(row.get("Year", "")),
+            tmdb_id=_parse_int(row.get("tmdbID", "")),
+            imdb_id=(row.get("imdbID") or "").strip() or None,
+        )
+        watched_date = (row.get("WatchedDate") or "").strip()
+        fingerprint = fingerprint_of(
+            rating10=_parse_int(row.get("Rating10", "")),
+            rewatch=(row.get("Rewatch") or "").strip().lower() == "true",
+            tags=row.get("Tags", ""),
+            review=row.get("Review", ""),
+        )
+        records.append((movie.key, watched_date, fingerprint))
+
+    return records
+
+
+def is_watchlist_file(path: Path) -> bool:
+    """True when the CSV is a watchlist export (no diary state to confirm)."""
+    with open(path, "r", encoding="utf-8") as handle:
+        header = handle.readline().strip()
+    return header == csv_format.format_row(WATCHLIST_HEADERS)
+
+
+def archive_file(path: Path, done_dir: Path, moment: Optional[datetime] = None) -> Path:
+    """Move a confirmed CSV into the timestamped archive directory."""
+    target_dir = Path(done_dir) / (moment or datetime.now()).strftime("%Y%m%d-%H%M%S")
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / Path(path).name
+    Path(path).replace(target)
+    return target
