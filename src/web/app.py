@@ -1,25 +1,27 @@
 """FastAPI web application."""
 
 import logging
+import os
 from contextlib import asynccontextmanager
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from src.config import Config
-from src.web.database import Database
+from src.models import rating10_to_rating5
+from src.web.database import Database, utcnow
 from src.web.sync_service import SyncService
 
 logger = logging.getLogger(__name__)
 
 # Initialize database
-db = Database()
+db = Database(Config.DB_PATH)
 sync_service: Optional[SyncService] = None
 
 
@@ -32,9 +34,8 @@ async def lifespan(app: FastAPI):
     logger.info("Starting web application...")
     sync_service = SyncService(db)
 
-    # Start background sync (every 15 minutes)
-    sync_interval = int(Config.SYNC_INTERVAL) if hasattr(Config, 'SYNC_INTERVAL') else 15
-    sync_service.start(interval_minutes=sync_interval)
+    # Optional background sync; the weekly scheduled task is the normal path.
+    sync_service.start(interval_minutes=int(os.getenv("SYNC_INTERVAL", "0") or 0))
 
     yield
 
@@ -61,7 +62,13 @@ templates = Jinja2Templates(directory=str(templates_path))
 
 # Pydantic models for API
 class MovieUpdate(BaseModel):
-    rating: Optional[float] = None
+    """Fields the dashboard can edit.
+
+    ``rating10`` is authoritative (it is what the CSV exports); ``rating`` on
+    the 0.5-5 scale is recomputed from it so the statistics stay consistent.
+    """
+
+    rating10: Optional[int] = None
     watched_date: Optional[str] = None
     rewatch: Optional[bool] = None
     tags: Optional[str] = None
@@ -173,6 +180,12 @@ async def update_movie(movie_id: int, updates: MovieUpdate):
             update_data["watched_date"] = date.fromisoformat(update_data["watched_date"])
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format")
+
+    if "rating10" in update_data:
+        rating10 = update_data["rating10"]
+        if rating10 is not None and not 1 <= rating10 <= 10:
+            raise HTTPException(status_code=400, detail="rating10 must be between 1 and 10")
+        update_data["rating"] = rating10_to_rating5(rating10)
 
     movie = db.update_movie(movie_id, update_data)
     if not movie:
@@ -297,58 +310,76 @@ async def auth_start():
 
 # ============== Export ==============
 
+
+@app.post("/api/export")
+async def run_export(full: bool = Query(False), watchlist: bool = Query(True)):
+    """Write import-ready CSV files into output/pending.
+
+    The dashboard never talks to Letterboxd: it only produces files that the
+    member uploads themselves at letterboxd.com/import.
+    """
+    from src.exporters.letterboxd import LetterboxdExporter
+
+    exporter = LetterboxdExporter(Config.pending_dir(), max_bytes=Config.MAX_CSV_BYTES)
+    state = None if full else db.get_export_state()
+    watched_result = exporter.export_watched(db.get_watch_entries(), state=state)
+
+    payload = {
+        "mode": "full" if full else "incremental",
+        "watched_rows": watched_result.rows,
+        "watched_files": [path.name for path in watched_result.files],
+        "unchanged": watched_result.skipped_unchanged,
+    }
+
+    if watchlist:
+        watchlist_result = exporter.export_watchlist(db.get_watchlist_entries())
+        payload["watchlist_rows"] = watchlist_result.rows
+        payload["watchlist_files"] = [path.name for path in watchlist_result.files]
+
+    if watched_result.files or payload.get("watchlist_files"):
+        db.update_sync_status(last_export=utcnow())
+
+    return payload
+
+
+@app.get("/api/export/pending")
+async def list_pending():
+    """List the CSV files waiting to be imported."""
+    files = sorted(Config.pending_dir().glob("*.csv"))
+    return {
+        "files": [
+            {"name": path.name, "bytes": path.stat().st_size}
+            for path in files
+        ]
+    }
+
+
 @app.get("/api/export/csv")
-async def export_csv(
-    watched: bool = Query(True),
-    watchlist: bool = Query(False),
-):
-    """Export movies to CSV format."""
-    from io import StringIO
-    import csv
-
-    output = StringIO()
-    writer = csv.writer(output)
-
-    if watched:
-        # Watched movies
-        writer.writerow([
-            "imdbID", "tmdbID", "Title", "Year", "Directors",
-            "WatchedDate", "Rating", "Rewatch", "Tags", "Review"
-        ])
-
-        movies = db.get_all_movies(watched=True, limit=10000)
-        for m in movies:
-            writer.writerow([
-                m.imdb_id or "",
-                m.tmdb_id or "",
-                m.title,
-                m.year or "",
-                m.directors or "",
-                m.watched_date.isoformat() if m.watched_date else "",
-                m.rating or "",
-                "true" if m.rewatch else "false",
-                m.tags or "",
-                m.review or "",
-            ])
-    elif watchlist:
-        # Watchlist
-        writer.writerow(["imdbID", "tmdbID", "Title", "Year", "Directors"])
-
-        movies = db.get_all_movies(watchlist=True, limit=10000)
-        for m in movies:
-            writer.writerow([
-                m.imdb_id or "",
-                m.tmdb_id or "",
-                m.title,
-                m.year or "",
-                m.directors or "",
-            ])
-
+async def export_csv(watchlist: bool = Query(False)):
+    """Download a single CSV in the Letterboxd import format."""
     from fastapi.responses import Response
+
+    from src.exporters.letterboxd import (
+        WATCHED_HEADERS,
+        WATCHLIST_HEADERS,
+        watched_row,
+        watchlist_row,
+    )
+    from src.letterboxd import csv_format
+
+    if watchlist:
+        content = csv_format.render(
+            WATCHLIST_HEADERS, [watchlist_row(entry) for entry in db.get_watchlist_entries()]
+        )
+        filename = "letterboxd_watchlist.csv"
+    else:
+        content = csv_format.render(
+            WATCHED_HEADERS, [watched_row(entry) for entry in db.get_watch_entries()]
+        )
+        filename = "letterboxd_watched.csv"
+
     return Response(
-        content=output.getvalue(),
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=letterboxd_{'watched' if watched else 'watchlist'}.csv"
-        },
+        content=content.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
