@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -7,9 +7,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
 
-RUN mkdir -p output logs data
+RUN mkdir -p output/pending output/done logs data
+
+ENV PYTHONIOENCODING=utf-8
 
 EXPOSE 19876
 
-# Default to web server, can be overridden for CLI
-ENTRYPOINT ["python", "src/server.py"]
+# Dashboard by default. Override the command for the CLI, e.g.
+#   docker compose run --rm letterboxd-sync sync
+#   docker compose run --rm letterboxd-sync export --incremental
+ENTRYPOINT ["python", "-m", "src.cli"]
+CMD ["serve", "--host", "0.0.0.0"]

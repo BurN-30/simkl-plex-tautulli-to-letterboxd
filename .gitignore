@@ -1,6 +1,8 @@
-# Environment
+# Environment and credentials
 .env
 .simkl_token
+data/simkl_token.json
+*.token
 
 # Python
 __pycache__/
@@ -32,3 +34,6 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+# Tests
+.pytest_cache/

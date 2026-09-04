@@ -1,15 +1,15 @@
-version: '3.8'
-
 services:
   letterboxd-sync:
     build: .
     ports:
+      # Dashboard, and the Simkl OAuth callback used on first authorisation
       - "${WEB_PORT:-19876}:19876"
+      - "${OAUTH_PORT:-19877}:19877"
     env_file:
       - .env
     volumes:
+      # The token lives in ./data, so this mount also persists the credential
       - ./output:/app/output
       - ./logs:/app/logs
       - ./data:/app/data
-      - ./.simkl_token:/app/.simkl_token
     restart: unless-stopped

@@ -138,7 +138,7 @@ class SimklOAuth:
 
         # Open browser for authorization
         auth_url = f"{self.AUTH_URL}?response_type=code&client_id={self.client_id}&redirect_uri={self.REDIRECT_URI}"
-        logger.info(f"Opening browser for authentication...")
+        logger.info("Opening browser for authentication...")
         webbrowser.open(auth_url)
 
         # Wait for callback
