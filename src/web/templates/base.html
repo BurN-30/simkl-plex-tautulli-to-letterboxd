@@ -195,6 +195,10 @@
                     <label class="block text-sm text-zinc-400 mb-1.5" data-i18n="modal.tags">Tags</label>
                     <input type="text" id="edit-tags" class="input w-full" placeholder="horror, favorite">
                 </div>
+                <div>
+                    <label class="block text-sm text-zinc-400 mb-1.5" data-i18n="modal.review">Review</label>
+                    <textarea id="edit-review" rows="5" class="input w-full" placeholder="Your review (basic HTML allowed)"></textarea>
+                </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" onclick="closeModal()" class="btn btn-ghost" data-i18n="modal.cancel">Cancel</button>
                     <button type="submit" class="btn btn-primary" data-i18n="modal.save">Save</button>
@@ -240,7 +244,7 @@
                 'auth.required':'Simkl connection required for sync','auth.connect':'Connect Simkl',
                 'auth.authorizing':'Authorize in the new window...','auth.connected':'Simkl connected',
                 'auth.timeout':'Timeout (5 min). Try again.','auth.network_error':'Network error — check that the server is running',
-                'modal.rating':'Rating','modal.watch_date':'Watch Date','modal.rewatch':'Rewatch','modal.tags':'Tags',
+                'modal.rating':'Rating','modal.watch_date':'Watch Date','modal.rewatch':'Rewatch','modal.tags':'Tags','modal.review':'Review',
                 'modal.cancel':'Cancel','modal.save':'Save','modal.saved':'Saved',
                 'settings.title':'Settings','settings.theme':'Theme','settings.dark':'Dark','settings.light':'Light','settings.system':'System','settings.language':'Language',
                 'index.films':'films','index.avg':'avg','index.watchlist':'watchlist',
@@ -261,7 +265,7 @@
                 'auth.required':'Connexion Simkl requise pour la synchronisation','auth.connect':'Connecter Simkl',
                 'auth.authorizing':'Autorisez dans la nouvelle fenêtre...','auth.connected':'Simkl connecté',
                 'auth.timeout':'Délai dépassé (5 min). Réessayez.','auth.network_error':'Erreur réseau — vérifiez que le serveur est en cours d\'exécution',
-                'modal.rating':'Note','modal.watch_date':'Date de visionnage','modal.rewatch':'Revoir','modal.tags':'Tags',
+                'modal.rating':'Note','modal.watch_date':'Date de visionnage','modal.rewatch':'Revoir','modal.tags':'Tags','modal.review':'Critique',
                 'modal.cancel':'Annuler','modal.save':'Sauvegarder','modal.saved':'Sauvegardé',
                 'settings.title':'Paramètres','settings.theme':'Thème','settings.dark':'Sombre','settings.light':'Clair','settings.system':'Système','settings.language':'Langue',
                 'index.films':'films','index.avg':'moy.','index.watchlist':'à voir',
@@ -374,6 +378,7 @@
             document.getElementById('edit-date').value = movie.watched_date || '';
             document.getElementById('edit-rewatch').checked = movie.rewatch || false;
             document.getElementById('edit-tags').value = movie.tags || '';
+            document.getElementById('edit-review').value = movie.review || '';
             updateStars(document.getElementById('edit-rating'), movie.rating || 0);
             document.getElementById('edit-modal').classList.remove('hidden');
             document.getElementById('edit-modal').classList.add('flex');
@@ -402,10 +407,12 @@
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    rating: parseFloat(document.getElementById('edit-rating').dataset.rating) || null,
+                    // The stars are on the 0.5-5 scale; the API and the CSV use Rating10.
+                    rating10: Math.round((parseFloat(document.getElementById('edit-rating').dataset.rating) || 0) * 2) || null,
                     watched_date: document.getElementById('edit-date').value || null,
                     rewatch: document.getElementById('edit-rewatch').checked,
                     tags: document.getElementById('edit-tags').value || null,
+                    review: document.getElementById('edit-review').value || null,
                 })
             });
             if (res.ok) { showToast(t('modal.saved')); closeModal(); if (typeof loadMovies === 'function') loadMovies(); }
