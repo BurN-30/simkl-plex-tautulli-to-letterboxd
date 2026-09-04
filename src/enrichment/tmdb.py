@@ -88,6 +88,8 @@ class TMDBClient:
             year=movie.year,
             tmdb_id=movie.tmdb_id,
             imdb_id=movie.imdb_id,
+            simkl_id=movie.simkl_id,
+            letterboxd_slug=movie.letterboxd_slug,
             directors=movie.directors.copy(),
         )
 

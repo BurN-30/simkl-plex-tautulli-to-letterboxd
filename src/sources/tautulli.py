@@ -1,13 +1,14 @@
 """Tautulli API client for retrieving watch history."""
 
 import logging
-from datetime import date, datetime
+from datetime import date
 from typing import List, Optional
 
 import requests
 
 from src.models import Movie, WatchEntry, WatchlistEntry
 from src.sources.base import BaseSource
+from src.timeutils import epoch_to_calendar_date
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +16,17 @@ logger = logging.getLogger(__name__)
 class TautulliSource(BaseSource):
     """Tautulli API client."""
 
-    def __init__(self, base_url: str, api_key: str, user_id: int = 1):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        user_id: int = 1,
+        timezone_name: str = "Europe/Paris",
+    ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.user_id = user_id
+        self.timezone_name = timezone_name
         self.session = requests.Session()
 
     @property
@@ -104,20 +112,17 @@ class TautulliSource(BaseSource):
                     year=int(year) if year else None,
                 )
 
-                # Parse watched date
-                watched_date = None
-                stopped = item.get("stopped")
-                if stopped:
-                    try:
-                        watched_date = datetime.fromtimestamp(stopped).date()
-                    except (ValueError, TypeError):
-                        pass
+                # Tautulli stores Unix timestamps; convert to the local zone
+                # before truncating to a calendar date.
+                watched_date = epoch_to_calendar_date(
+                    item.get("stopped"), self.timezone_name
+                )
 
-                # Tautulli doesn't have user ratings
+                # Tautulli does not expose user ratings.
                 entry = WatchEntry(
                     movie=movie,
                     watched_date=watched_date,
-                    rating=None,
+                    rating10=None,
                     rewatch=is_rewatch,
                 )
                 entries.append(entry)

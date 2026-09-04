@@ -2,11 +2,12 @@
 
 import logging
 import re
-from datetime import date, datetime
+from datetime import timezone
 from typing import List, Optional
 
 from src.models import Movie, WatchEntry, WatchlistEntry
 from src.sources.base import BaseSource
+from src.timeutils import get_zone
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +15,10 @@ logger = logging.getLogger(__name__)
 class PlexSource(BaseSource):
     """Plex API client using python-plexapi."""
 
-    def __init__(self, base_url: str, token: str):
+    def __init__(self, base_url: str, token: str, timezone_name: str = "Europe/Paris"):
         self.base_url = base_url.rstrip("/")
         self.token = token
+        self.timezone_name = timezone_name
         self._server = None
 
     @property
@@ -71,20 +73,25 @@ class PlexSource(BaseSource):
                 if not movie:
                     continue
 
-                # Get watch date
+                # Plex hands out naive UTC datetimes; convert to the local
+                # zone before truncating, so a late-evening watch keeps its
+                # calendar day.
                 watched_date = None
                 if item.lastViewedAt:
-                    watched_date = item.lastViewedAt.date()
+                    moment = item.lastViewedAt
+                    if moment.tzinfo is None:
+                        moment = moment.replace(tzinfo=timezone.utc)
+                    watched_date = moment.astimezone(get_zone(self.timezone_name)).date()
 
-                # Get rating (Plex uses 1-10 scale)
-                rating = None
+                # Plex user ratings are on a 1-10 scale, like Rating10.
+                rating10 = None
                 if item.userRating:
-                    rating = WatchEntry.convert_rating_10_to_5(item.userRating)
+                    rating10 = max(1, min(10, int(round(float(item.userRating)))))
 
                 entry = WatchEntry(
                     movie=movie,
                     watched_date=watched_date,
-                    rating=rating,
+                    rating10=rating10,
                     rewatch=item.viewCount > 1 if item.viewCount else False,
                 )
                 entries.append(entry)
